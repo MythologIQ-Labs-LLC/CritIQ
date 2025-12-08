@@ -729,4 +729,8 @@ export class TaskEngine {
     private suggestHelp(task: Task): void {
         this.notificationService.showInfo(`Need help with ${task.name}? Check the specs or ask Gemini.`);
     }
+
+    public generateGraph(): string {
+        return this.projectPlan.generateMermaidGraph();
+    }
 }

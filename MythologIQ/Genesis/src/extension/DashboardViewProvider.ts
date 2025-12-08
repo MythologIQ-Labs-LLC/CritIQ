@@ -48,6 +48,13 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
                         });
                     }
                     break;
+                case 'getGraph':
+                    const graph = this._taskEngine.generateGraph();
+                    webviewView.webview.postMessage({
+                        type: 'graphUpdate',
+                        data: { graph }
+                    });
+                    break;
             }
         });
 
@@ -72,7 +79,7 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
         htmlContent = htmlContent.replace(
             '<head>', 
             `<head>
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this._view.webview.cspSource}; script-src 'nonce-${cspNonce}'; img-src ${this._view.webview.cspSource};">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this._view.webview.cspSource}; script-src 'nonce-${cspNonce}' https://cdn.jsdelivr.net; img-src ${this._view.webview.cspSource};">
             <meta property="csp-nonce" content="${cspNonce}">`
         );
 

@@ -487,6 +487,54 @@ export class ProjectPlan {
         }
     }
 
+    public generateMermaidGraph(): string {
+        const tasks = this.getAllTasks();
+        if (tasks.length === 0) {
+            return 'graph TD;\nStart[No Tasks]';
+        }
+
+        let graph = 'graph TD;\n';
+        
+        // Define Styles
+        graph += 'classDef default fill:#1e1e1e,stroke:#333,stroke-width:1px,color:#fff;\n';
+        graph += 'classDef completed fill:#2e7d32,stroke:#4caf50,stroke-width:2px,color:#fff;\n';
+        graph += 'classDef inProgress fill:#1565c0,stroke:#2196f3,stroke-width:2px,color:#fff;\n';
+        graph += 'classDef blocked fill:#c62828,stroke:#f44336,stroke-width:2px,color:#fff;\n';
+        graph += 'classDef critical stroke:#fdd835,stroke-dasharray: 5 5;\n';
+
+        tasks.forEach(task => {
+            // sanitize ID and name
+            const safeId = task.id.replace(/[^a-zA-Z0-9]/g, '_');
+            const safeName = task.name.replace(/["()]/g, '').substr(0, 30); // limit length
+            
+            // Add Node
+            graph += `${safeId}["${safeName}"];\n`;
+
+            // Apply Class
+            let className = 'default';
+            if (task.status === TaskStatus.completed) className = 'completed';
+            else if (task.status === TaskStatus.inProgress) className = 'inProgress';
+            else if (task.status === TaskStatus.blocked) className = 'blocked';
+            
+            graph += `class ${safeId} ${className};\n`;
+
+            if (task.priority === TaskPriority.critical) {
+                graph += `class ${safeId} critical;\n`;
+            }
+
+            // Add Dependencies
+            task.dependencies.forEach(depId => {
+                const depTask = tasks.find(t => t.id === depId);
+                if (depTask) {
+                    const safeDepId = depTask.id.replace(/[^a-zA-Z0-9]/g, '_');
+                    graph += `${safeDepId} --> ${safeId};\n`;
+                }
+            });
+        });
+
+        return graph;
+    }
+
     public getProjectProgress(): { totalTasks: number; completedTasks: number; inProgressTasks: number; blockedTasks: number; progressPercentage: number; estimatedRemainingTime: number; } {
         const tasks = this.getAllTasks();
         const totalTasks = tasks.length;

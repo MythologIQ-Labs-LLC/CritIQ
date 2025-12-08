@@ -89,6 +89,20 @@ body {
     grid-row: 2 / 3;
 }
 
+.mind-map-card {
+    grid-column: 1 / 3;
+    grid-row: 3 / 4;
+    min-height: 400px;
+}
+
+#mind-map-container {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
 /* Cards */
 .card {
     background: var(--card-bg);

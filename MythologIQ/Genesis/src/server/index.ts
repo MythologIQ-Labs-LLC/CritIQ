@@ -146,6 +146,12 @@ export class FailSafeServer {
                 return { status: 'error', message: result.error };
             }
         });
+
+        // GET /api/project/graph - Get Mermaid Graph
+        this.server.get('/api/project/graph', async () => {
+             const graph = this.projectPlan.generateMermaidGraph();
+             return { graph };
+        });
     }
 
     private async start(): Promise<void> {
