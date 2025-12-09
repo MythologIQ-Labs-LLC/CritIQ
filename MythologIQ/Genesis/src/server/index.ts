@@ -1,36 +1,34 @@
-/// <reference types="node" />
 import fastify, { FastifyInstance } from 'fastify';
-import { Logger } from './logger';
+import { ILogger, INotificationService, IDocumentService, IWorkspaceService, IInputService } from '../core/interfaces';
 import * as net from 'net';
 import fastifyHealth from './plugins/fastify-health';
 import fastifyMetrics from './plugins/fastify-metrics';
+import fastifyStatic from '@fastify/static';
+import * as path from 'path';
 import { ProjectPlan } from './projectPlan';
 import { TaskEngine } from './taskEngine';
-import {
-    INotificationService,
-    IDocumentService,
-    IWorkspaceService,
-    IInputService
-} from '../core/interfaces';
+import { IntentScout } from './scout/IntentScout';
 
 export class FailSafeServer {
     private readonly server: FastifyInstance;
-    private readonly logger: Logger;
+    private readonly logger: ILogger;
     private port = 0;
     private isRunning = false;
     private taskEngine: TaskEngine;
     private projectPlan: ProjectPlan;
+    private intentScout: IntentScout;
 
     constructor(
-        logger: Logger,
+        logger: ILogger,
         notificationService: INotificationService,
         documentService: IDocumentService,
         workspaceService: IWorkspaceService,
         inputService: IInputService
     ) {
         this.logger = logger;
-        this.projectPlan = new ProjectPlan(this.logger, workspaceService, inputService);
+        this.projectPlan = new ProjectPlan(this.logger, workspaceService, inputService, notificationService);
         this.taskEngine = new TaskEngine(this.projectPlan, this.logger, notificationService, documentService);
+        this.intentScout = new IntentScout(this.logger);
         
         this.server = fastify({
             logger: {
@@ -100,6 +98,19 @@ export class FailSafeServer {
                 retentionDays: 30
             });
 
+            // Register static files (Dashboard)
+            await this.server.register(fastifyStatic, {
+                root: path.join(__dirname, '../dashboard'),
+                prefix: '/', 
+            });
+
+            // Register media files
+            await this.server.register(fastifyStatic, {
+                root: path.join(__dirname, '../../media'), // Up from src/server to root/media
+                prefix: '/media/',
+                decorateReply: false // Avoid decorator conflict
+            });
+
             this.logger.info('Core Fastify plugins registered successfully');
         } catch (error) {
             this.logger.error('Failed to register Fastify plugins:', error);
@@ -151,6 +162,36 @@ export class FailSafeServer {
         this.server.get('/api/project/graph', async () => {
              const graph = this.projectPlan.generateMermaidGraph();
              return { graph };
+        });
+
+        // GET /api/blueprint/graph - Get Blueprint Mind Map
+        this.server.get('/api/blueprint/graph', async () => {
+            const concept = await this.projectPlan.loadBlueprint();
+            if (concept) {
+                return { graph: this.projectPlan.generateConceptMindMap(concept) };
+            }
+            return { graph: '' };
+        });
+
+        // POST /api/blueprint/sync - Update Blueprint File with Mind Map
+        this.server.post('/api/blueprint/sync', async (request, reply) => {
+            await this.projectPlan.updateBlueprintMindMap();
+            return { status: 'success' };
+        });
+
+        // GET /api/project/graph/d3 - Get D3 Graph Data (The Living Graph)
+        this.server.get('/api/project/graph/d3', async () => {
+            return this.projectPlan.dependencyGraph.toD3();
+        });
+
+        // POST /api/cortex/query - Cortex Omnibar Intent Scout
+        this.server.post<{ Body: { query: string } }>('/api/cortex/query', async (request, reply) => {
+            const { query } = request.body;
+            if (!query) {
+                return { status: 'error', message: 'Query required' };
+            }
+            const intent = this.intentScout.scout(query);
+            return { status: 'success', intent };
         });
     }
 

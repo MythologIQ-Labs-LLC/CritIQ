@@ -1,9 +1,10 @@
-import * as vscode from 'vscode'; // Kept for extension integration only
+// import * as vscode from 'vscode'; // REMOVED for Universal Bridge Decoupling
 import * as fs from 'fs';
 import * as path from 'path';
-import { Logger } from './logger';
-import { Task, TaskStatus, TaskPriority } from './types';
-import { IWorkspaceService, IInputService } from '../core/interfaces';
+import { ILogger, IWorkspaceService, IInputService, INotificationService } from '../core/interfaces';
+import { Task, TaskStatus, TaskPriority, GenesisConcept } from './types';
+import { ValidationBridge, ValidationReport } from './validation/ValidationBridge';
+import { DependencyGraph } from './graph/DependencyGraph';
 
 // Basic project integration for FailSafe
 export interface BasicProjectPlan {
@@ -15,6 +16,7 @@ export interface BasicProjectPlan {
     lastUpdated: Date;
     createdBy: string;
     version: string;
+    concept?: GenesisConcept;
 }
 
 export interface ProjectIntegration {
@@ -47,101 +49,65 @@ export interface LinearProgressState {
 }
 
 export class ProjectPlan {
-    private readonly logger: Logger;
+    private readonly logger: ILogger; // Changed to Interface
     private readonly workspaceService: IWorkspaceService;
     private readonly inputService: IInputService;
+    private readonly notificationService: INotificationService; // Added Interface
     private currentPlan: BasicProjectPlan | null = null;
     private readonly projectFile: string;
     private readonly linearMode = true;
     private lastActivity: Date = new Date();
-    private readonly projectManagerExtension: ProjectIntegration | null = null;
+    // private readonly projectManagerExtension: ProjectIntegration | null = null; // Removed for Decoupling
+    private readonly blueprintFile: string;
+    private readonly taskFile: string;
+    private readonly validationBridge: ValidationBridge;
+    public readonly dependencyGraph: DependencyGraph;
 
     constructor(
-        logger: Logger,
+        logger: ILogger,
         workspaceService: IWorkspaceService,
-        inputService: IInputService
+        inputService: IInputService,
+        notificationService: INotificationService
     ) {
         this.logger = logger;
         this.workspaceService = workspaceService;
         this.inputService = inputService;
+        this.notificationService = notificationService;
         // Primary Source: task.md in root
         const rootPath = this.workspaceService.getRootPath() || '';
         this.taskFile = this.workspaceService.pathJoin(rootPath, 'task.md');
         // Secondary Source: internal JSON
         this.projectFile = this.workspaceService.pathJoin(rootPath, '.failsafe', 'basic-project.json');
-        this.initializeProjectManagerIntegration();
+        // Blueprint Source
+        // Blueprint Source
+        this.blueprintFile = this.workspaceService.pathJoin(rootPath, 'Design Documents', 'FailSafe_BLUEPRINT.md');
+        
+        // Validation Bridge
+        this.validationBridge = new ValidationBridge(rootPath);
+        
+        // Dependency Graph (The Living Graph)
+        this.dependencyGraph = new DependencyGraph(rootPath, logger);
+
+        // this.initializeProjectManagerIntegration(); // Disabled for Universal Bridge
+    }
+
+    /*
+    // Disabled VSCode Extension Integration for Universal Bridge
+    private async initializeProjectManagerIntegration(): Promise<void> {
+       // ... (Implementation relies on vscode.extensions)
     }
     
-    private readonly taskFile: string;
-
-    private async initializeProjectManagerIntegration(): Promise<void> {
-        try {
-            // Check if Project Management Extension is available
-            const extensions = vscode.extensions.all;
-            const projectManagerExt = extensions.find(ext => 
-                ext.id === 'mythologiq.project-manager' || 
-                ext.id.includes('project-manager')
-            );
-
-            if (projectManagerExt) {
-                // Initialize integration with Project Management Extension
-                this.logger.info('Project Management Extension found, initializing integration');
-                
-                // Basic extension-to-extension communication
-                try {
-                    // Try to activate the extension and get its API
-                    if (!projectManagerExt.isActive) {
-                        await projectManagerExt.activate();
-                    }
-                    
-                    // Attempt to communicate via commands
-                    const commands = await vscode.commands.getCommands(true);
-                    const hasProjectCommands = commands.some(cmd => 
-                        cmd.includes('project') || cmd.includes('task') || cmd.includes('mythologiq')
-                    );
-                    
-                    if (hasProjectCommands) {
-                        this.logger.info('Project Management Extension commands detected, integration available');
-                        // Set up basic integration
-                        this.setupExtensionIntegration(projectManagerExt);
-                    } else {
-                        this.logger.info('Project Management Extension found but no integration commands available');
-                    }
-                } catch (error) {
-                    this.logger.warn('Failed to initialize extension integration, using basic mode', error);
-                }
-            } else {
-                this.logger.info('No Project Management Extension found, using basic project tracking');
-            }
-        } catch (error) {
-            this.logger.error('Failed to initialize project manager integration', error);
-        }
-    }
-
-    private setupExtensionIntegration(extension: vscode.Extension<any>): void {
-        // Set up basic integration with the project management extension
-        this.logger.info('Setting up extension integration');
-        
-        // Register commands that can be called by the other extension
-        vscode.commands.registerCommand('failsafe.getProjectStatus', () => {
-            return this.getProjectStatus();
-        });
-        
-        vscode.commands.registerCommand('failsafe.getCurrentTask', () => {
-            return this.getCurrentTask();
-        });
-        
-        vscode.commands.registerCommand('failsafe.recordActivity', (activity: string) => {
-            this.recordActivity(activity);
-        });
-        
-        this.logger.info('Extension integration commands registered');
-    }
+    // ... setupExtensionIntegration
+    */
+    
+    // Mock for now until we define Universal Integration
+    private setupExtensionIntegration(extension: any): void {}
 
     public async initialize(): Promise<void> {
         try {
             await this.loadProject();
-            this.logger.info('Basic project plan initialized');
+            await this.dependencyGraph.initialize();
+            this.logger.info('Project plan & Graph initialized');
         } catch (error) {
             this.logger.error('Failed to initialize basic project plan', error);
         }
@@ -385,17 +351,10 @@ export class ProjectPlan {
     }
 
     public getCurrentTask(): Task | null {
-        if (this.projectManagerExtension) {
-            return this.projectManagerExtension.getCurrentTask();
-        }
         return this.currentPlan?.currentTask || null;
     }
 
     public getAllTasks(): Task[] {
-        if (this.projectManagerExtension) {
-            // Get tasks from Project Management Extension
-            return [];
-        }
         return this.currentPlan?.tasks || [];
     }
 
@@ -420,11 +379,6 @@ export class ProjectPlan {
     }
 
     public async startTask(taskId: string): Promise<void> {
-        if (this.projectManagerExtension) {
-            // Delegate to Project Management Extension
-            this.logger.info('Delegating task start to Project Management Extension');
-            return;
-        }
 
         const task = this.currentPlan?.tasks.find(t => t.id === taskId);
         if (task && this.currentPlan) {
@@ -437,11 +391,6 @@ export class ProjectPlan {
     }
 
     public async completeTask(taskId: string): Promise<void> {
-        if (this.projectManagerExtension) {
-            // Delegate to Project Management Extension
-            this.logger.info('Delegating task completion to Project Management Extension');
-            return;
-        }
 
         const task = this.currentPlan?.tasks.find(t => t.id === taskId);
         if (task && this.currentPlan) {
@@ -456,11 +405,6 @@ export class ProjectPlan {
     }
 
     public async blockTask(taskId: string, reason: string): Promise<void> {
-        if (this.projectManagerExtension) {
-            // Delegate to Project Management Extension
-            this.logger.info('Delegating task blocking to Project Management Extension');
-            return;
-        }
 
         const task = this.currentPlan?.tasks.find(t => t.id === taskId);
         if (task) {
@@ -472,12 +416,6 @@ export class ProjectPlan {
     }
 
     public async unblockTask(taskId: string): Promise<void> {
-        if (this.projectManagerExtension) {
-            // Delegate to Project Management Extension
-            this.logger.info('Delegating task unblocking to Project Management Extension');
-            return;
-        }
-
         const task = this.currentPlan?.tasks.find(t => t.id === taskId);
         if (task && task.status === TaskStatus.blocked) {
             task.status = TaskStatus.notStarted;
@@ -535,6 +473,168 @@ export class ProjectPlan {
         return graph;
     }
 
+    public generateConceptMindMap(concept: GenesisConcept): string {
+        let graph = 'graph LR;\n'; 
+        
+        // Helper to sanitize strings for mermaid - ensure no markup breaking chars
+        // And wrap text for readability in the graph
+        const clean = (str: string) => {
+            const sanitized = str.replace(/["()]/g, '').trim().substring(0, 200);
+            // Word wrap every 30 chars using mermaid compatible newline escape sequence
+            return sanitized.replace(/(.{1,30})(?:\s+|$)/g, '$1\\n');
+        };
+
+        // Define Styles 
+        graph += 'classDef core fill:#6a1b9a,stroke:#4a148c,stroke-width:3px,color:#fff;\n'; 
+        graph += 'classDef prism fill:#00695c,stroke:#004d40,stroke-width:2px,color:#fff;\n'; 
+        graph += 'classDef immersion fill:#c62828,stroke:#b71c1c,stroke-width:2px,color:#fff;\n'; 
+        graph += 'classDef value fill:#ef6c00,stroke:#e65100,stroke-width:2px,color:#fff;\n'; 
+
+        // Central Node
+        const rootId = 'root';
+        graph += `${rootId}(("${clean(concept.featureName)}")):::core;\n`;
+
+        // Branch 1: Strategy
+        const stratId = 'strategy';
+        graph += `${stratId}[Strategic Core]:::core;\n`;
+        graph += `${rootId} --> ${stratId};\n`;
+        
+        if (concept.strategy.pain) graph += `pain["Pain: ${clean(concept.strategy.pain)}"]:::value;\n${stratId} --> pain;\n`;
+        if (concept.strategy.value) graph += `value["Value: ${clean(concept.strategy.value)}"]:::value;\n${stratId} --> value;\n`;
+        if (concept.strategy.antiGoal) graph += `anti["Anti-Goal: ${clean(concept.strategy.antiGoal)}"]:::value;\n${stratId} --> anti;\n`;
+
+        // Branch 2: Immersion
+        const immerseId = 'immersion';
+        graph += `${immerseId}[Immersion]:::immersion;\n`;
+        graph += `${rootId} --> ${immerseId};\n`;
+        
+        // Use standard rounded shape () instead of stadium ([""]) for better compatibility
+        if (concept.immersion.feeling) graph += `feeling("Feeling: ${clean(concept.immersion.feeling)}"):::immersion;\n${immerseId} --> feeling;\n`;
+        if (concept.immersion.workspaceZoom) graph += `zoom("Zoom: ${clean(concept.immersion.workspaceZoom)}"):::immersion;\n${immerseId} --> zoom;\n`;
+
+        concept.immersion.tools.forEach((tool, index) => {
+            const toolId = `tool_${index}`;
+            graph += `${toolId}("Tool: ${clean(tool)}"):::immersion;\n`;
+            graph += `${immerseId} --> ${toolId};\n`;
+        });
+
+        // Branch 3: Prism
+        const prismId = 'prism';
+        graph += `${prismId}[The Prism]:::prism;\n`;
+        graph += `${rootId} --> ${prismId};\n`;
+
+        concept.prism.impossibleIdeas.forEach((idea, index) => {
+            if (idea) {
+                const ideaId = `impossible_${index}`;
+                // Use standard parallelogram [/ /] syntax without extra spaces
+                graph += `${ideaId}[/"${clean(idea)}"/]:::prism;\n`; 
+                graph += `${prismId} --> ${ideaId};\n`;
+            }
+        });
+
+        // Branch 4: System Architecture
+        if (concept.system) {
+            const sysId = 'system';
+            graph += `${sysId}[System Arch]:::prism;\n`;
+            graph += `${rootId} --> ${sysId};\n`;
+
+            if (concept.system.frontend.length) {
+                const feId = 'frontend';
+                graph += `${feId}[Frontend]:::prism;\n${sysId} --> ${feId};\n`;
+                concept.system.frontend.forEach((item, i) => graph += `fe_${i}("${clean(item)}"):::prism;\n${feId} --> fe_${i};\n`);
+            }
+             if (concept.system.backend.length) {
+                const beId = 'backend';
+                graph += `${beId}[Backend]:::prism;\n${sysId} --> ${beId};\n`;
+                concept.system.backend.forEach((item, i) => graph += `be_${i}("${clean(item)}"):::prism;\n${beId} --> be_${i};\n`);
+            }
+             if (concept.system.data.length) {
+                const dataId = 'data';
+                graph += `${dataId}[Data Layer]:::prism;\n${sysId} --> ${dataId};\n`;
+                concept.system.data.forEach((item, i) => graph += `data_${i}("${clean(item)}"):::prism;\n${dataId} --> data_${i};\n`);
+            }
+        }
+
+        return graph;
+    }
+
+    public async loadBlueprint(): Promise<GenesisConcept | null> {
+        try {
+            if (fs.existsSync(this.blueprintFile)) {
+                const content = fs.readFileSync(this.blueprintFile, 'utf8');
+                const concept = this.parseBlueprintMarkdown(content);
+                this.logger.info('Blueprint loaded', { name: concept.featureName });
+                return concept;
+            }
+        } catch (error) {
+            this.logger.error('Failed to load blueprint', error);
+        }
+        return null;
+    }
+
+    public async updateBlueprintMindMap(): Promise<void> {
+        const concept = await this.loadBlueprint();
+        if (concept) {
+            const graph = this.generateConceptMindMap(concept);
+            
+            // Inject into file
+            let content = fs.readFileSync(this.blueprintFile, 'utf8');
+            const graphBlock = `\n## V. Conceptual Mind Map\n\n\`\`\`mermaid\n${graph}\n\`\`\`\n`;
+            
+            // Check if already exists
+            if (content.includes('## V. Conceptual Mind Map')) {
+                // Replace existing
+                content = content.replace(/## V\. Conceptual Mind Map[\s\S]*?```[\s\S]*?```/, `## V. Conceptual Mind Map\n\n\`\`\`mermaid\n${graph}\n\`\`\``);
+            } else {
+                // Append
+                content += graphBlock;
+            }
+            
+            fs.writeFileSync(this.blueprintFile, content, 'utf8');
+            this.logger.info('Blueprint updated with Mind Map');
+        }
+    }
+
+    private parseBlueprintMarkdown(content: string): GenesisConcept {
+        // Simple regex extractors
+        const extract = (regex: RegExp) => {
+            const match = content.match(regex);
+            return match ? match[1].trim() : '';
+        };
+
+        const extractList = (sectionHeader: string): string[] => {
+            const regex = new RegExp(`${sectionHeader}[\\s\\S]*?(?=###|##|$)`);
+            const section = content.match(regex);
+            if (!section) return [];
+            return (section[0].match(/- .*/g) || []).map(line => line.replace(/- (\*\*.*?\*\*: )?/, '').trim());
+        };
+
+        return {
+            id: 'failsafe-blueprint',
+            featureName: extract(/^# Blueprint: (.*)/m) || 'FailSafe',
+            status: 'draft',
+            strategy: {
+                pain: extract(/- \*\*The Pain\*\*: (.*)/),
+                value: extract(/- \*\*The Gain\*\*: (.*)/) || extract(/- \*\*The Value\*\*: (.*)/),
+                antiGoal: extract(/- \*\*Discard\*\*: (.*)/)
+            },
+            immersion: {
+                feeling: extract(/- \*\*Vibe\*\*: (.*)/),
+                workspaceZoom: extract(/- \*\*Visuals\*\*:[\s\S]*?- \*\*The HUD\*\*: (.*)/), // Approximation
+                tools: [] // Hard to map cleanly without stricter format
+            },
+            prism: {
+                provocations: [],
+                impossibleIdeas: []
+            },
+            system: {
+                frontend: extractList('### 1. The Frontend'),
+                backend: extractList('### 2. The Backend'),
+                data: extractList('### 3. The Data Layer')
+            }
+        };
+    }
+
     public getProjectProgress(): { totalTasks: number; completedTasks: number; inProgressTasks: number; blockedTasks: number; progressPercentage: number; estimatedRemainingTime: number; } {
         const tasks = this.getAllTasks();
         const totalTasks = tasks.length;
@@ -567,11 +667,6 @@ export class ProjectPlan {
     }
 
     public addTask(task: Task): void {
-        if (this.projectManagerExtension) {
-            // Delegate to Project Management Extension
-            this.logger.info('Delegating task addition to Project Management Extension');
-            return;
-        }
 
         if (this.currentPlan) {
             this.currentPlan.tasks.push(task);
@@ -580,11 +675,6 @@ export class ProjectPlan {
     }
 
     public removeTask(taskId: string): void {
-        if (this.projectManagerExtension) {
-            // Delegate to Project Management Extension
-            this.logger.info('Delegating task removal to Project Management Extension');
-            return;
-        }
 
         if (this.currentPlan) {
             this.currentPlan.tasks = this.currentPlan.tasks.filter(task => task.id !== taskId);
@@ -648,11 +738,13 @@ export class ProjectPlan {
     }
 
     public enforceLinearProgression(): void {
+        /*
         if (this.projectManagerExtension) {
             // Delegate to Project Management Extension
             this.logger.info('Delegating linear progression to Project Management Extension');
             return;
         }
+        */
 
         // Basic linear progression enforcement
         const tasks = this.getAllTasks();
@@ -668,6 +760,7 @@ export class ProjectPlan {
     }
 
     public analyzeFeasibility(): BlockerAnalysis {
+        /*
         if (this.projectManagerExtension) {
             // Delegate to Project Management Extension
             this.logger.info('Delegating feasibility analysis to Project Management Extension');
@@ -679,6 +772,7 @@ export class ProjectPlan {
                 estimatedImpact: 'low'
             };
         }
+        */
 
         // Basic feasibility analysis
         const currentTask = this.getCurrentTask();
@@ -763,6 +857,35 @@ export class ProjectPlan {
         };
     }
 
+    public async createConcept(concept: GenesisConcept): Promise<void> {
+        if (!this.currentPlan) {
+            this.logger.warn('Cannot create concept: No project plan loaded');
+            return;
+        }
+
+        this.currentPlan.concept = concept;
+        this.currentPlan.lastUpdated = new Date();
+        
+        // Also save as standalone concept.json for the "Gates"
+        const conceptFile = this.workspaceService.pathJoin(
+            this.workspaceService.getRootPath() || '', 
+            '.failsafe', 
+            'concept.json'
+        );
+        
+        try {
+            this.workspaceService.ensureDirectory(path.dirname(conceptFile));
+            // In a real extension we'd use workspaceService.writeFile, but specific fs usage here follows pattern
+            fs.writeFileSync(conceptFile, JSON.stringify(concept, null, 2));
+            this.logger.info('Concept crystallized to concept.json');
+        } catch (e) {
+            this.logger.error('Failed to write concept.json', e);
+        }
+
+        await this.saveProject();
+        this.logger.info('Genesis Concept created and linked to project');
+    }
+
     public async validatePlan(): Promise<{
         status: 'missing' | 'empty' | 'invalid' | 'in_progress' | 'complete';
         ruleResults: string[];
@@ -771,6 +894,7 @@ export class ProjectPlan {
         llmIsCurrent: boolean;
         llmTimestamp: Date | null;
     }> {
+        /*
         if (this.projectManagerExtension) {
             // Delegate to Project Management Extension
             this.logger.info('Delegating plan validation to Project Management Extension');
@@ -783,6 +907,7 @@ export class ProjectPlan {
                 llmTimestamp: null
             };
         }
+        */
 
         if (!this.currentPlan) {
             return {

@@ -44,3 +44,34 @@
 # Backlog: Future Features
 
 - [x] Mind Map capability for Project Blueprint (visualization of specs, dependencies, and architecture)
+
+# Task: Genesis Process Logic (The Prism & Concept)
+
+- [x] Define `GenesisConcept` Interfaces (Prism, Strategy, Immersion)
+- [x] Implement `generateConceptMindMap` (Refraction Visualization)
+- [ ] Integrate with Dashboard UI (Visualizing the Chaos)
+- [ ] Implement "Oblique Strategies" Generator (The Prism)
+
+# Task: Design Phase Execution (Blueprint & Standards)
+
+- [x] Implement Blueprint Parsing & Mind Map Generation (`ProjectPlan.ts`)
+- [x] Expose Blueprint API (`index.ts`)
+- [x] Generate Initial Mind Map for FailSafe Blueprint
+
+# Task: Validation Gates Design (The Safety Net)
+
+- [x] Spec: Validation Bridge (`IGate`)
+- [x] Spec: Filesystem Gate (`FsGate`)
+- [x] Spec: Specification Gate (`SpecGate`)
+- [ ] Spec: Decorators (Editor Highlighting)
+- [ ] Spec: Audit Logs (Drift Analysis)
+- [ ] Spec: Genesis Wizard (State Machine)
+- [ ] Implement Validation Gates (Phase 3 Loop)
+
+# Task: Dashboard IPC & Reactivity
+
+- [x] Define Strict IPC Types (`messages.ts`)
+- [x] Implement Event-Driven TaskEngine (`EventEmitter`)
+- [x] Refactor DashboardViewProvider to use IPC Events
+- [x] Refactor Dashboard Client (`app.js`) to Native PostMessage
+- [x] Verify Compilation & Build

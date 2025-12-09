@@ -191,6 +191,367 @@ body {
     font-size: 0.8rem;
 }
 
-.notification-item .msg {
+/* Genesis Lab Overlay (The Prism) */
+.genesis-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(13, 17, 23, 0.95);
+    backdrop-filter: blur(20px);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.genesis-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+    display: none; /* simple hide for now */
+}
+
+.genesis-container {
+    width: 50%;
+    max-width: 600px;
+    height: 90%;
+    background: linear-gradient(135deg, rgba(22, 27, 34, 0.8), rgba(30, 40, 50, 0.6));
+    border: 1px solid rgba(88, 166, 255, 0.2);
+    border-radius: 16px;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+    margin-right: 20px;
+}
+
+.genesis-preview {
+    width: 40%;
+    height: 90%;
+    background: rgba(22, 27, 34, 0.6);
+    border: 1px dashed rgba(88, 166, 255, 0.2);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Header stays, content scrolls */
+}
+
+#genesis-preview-graph {
+    flex: 1;
+    overflow: auto; /* Allow scrolling for large maps */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+}
+
+.genesis-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.genesis-header h2 {
+    font-size: 1.8rem;
+    background: linear-gradient(90deg, #58a6ff, #8b949e);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0;
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 2rem;
+    cursor: pointer;
+}
+
+/* Wizard Progress */
+.wizard-progress {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 30px;
+    position: relative;
+}
+
+.wizard-progress::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--card-border);
+    z-index: -1;
+    transform: translateY(-50%);
+}
+
+.step {
+    background: var(--bg-color);
+    padding: 5px 15px;
+    border-radius: 20px;
+    border: 1px solid var(--card-border);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    transition: all 0.3s;
+}
+
+.step.active {
+    border-color: #58a6ff;
+    color: #58a6ff;
+    background: rgba(88, 166, 255, 0.1);
+    box-shadow: 0 0 10px rgba(88, 166, 255, 0.2);
+}
+
+/* Wizard Content */
+.wizard-step {
+    display: none;
+    flex-direction: column;
+    gap: 20px;
+    flex: 1;
+    overflow-y: auto;
+    animation: fadeIn 0.4s ease;
+}
+
+.wizard-step.active {
+    display: flex;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Prism Specifics */
+.provocation-box {
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.1), transparent);
+    border: 1px solid rgba(88, 166, 255, 0.2);
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.provocation-box .icon {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 10px;
+}
+
+.provocation-box p {
+    font-size: 1.2rem;
+    font-style: italic;
+    color: #58a6ff;
+    margin: 0 0 10px 0;
+}
+
+.btn-text {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+/* Form Elements */
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.input-group label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.input-group input, .input-group textarea {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 12px;
     color: var(--text-primary);
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.input-group textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.input-group input:focus, .input-group textarea:focus {
+    outline: none;
+    border-color: #58a6ff;
+    box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.2);
+}
+
+/* Step Actions */
+.step-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: auto;
+    padding-top: 20px;
+}
+
+/* Immersion Guide */
+.immersion-guide {
+    text-align: center;
+    color: #e6edf3;
+    font-size: 1.1rem;
+    padding: 10px;
+    border-left: 3px solid #f78166;
+    background: rgba(247, 129, 102, 0.1);
+}
+
+/* Add a floating action button for launching Genesis */
+.fab-genesis {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #6a1b9a, #4a148c);
+    border-radius: 50%;
+    color: white;
+    font-size: 24px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 5px 20px rgba(106, 27, 154, 0.5);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+}
+
+.fab-genesis:hover {
+    transform: scale(1.1);
+    box-shadow: 0 8px 30px rgba(106, 27, 154, 0.7);
+}
+
+/* --- Starry Night Theme & Living Graph --- */
+
+@keyframes move-twinkle {
+    0% { background-position: 0 0; }
+    100% { background-position: -100px -100px; }
+}
+
+@keyframes nebula-pulse {
+    0% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.1); }
+    100% { opacity: 0.3; transform: scale(1); }
+}
+
+/* Background Override */
+body.theme-dark {
+    background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+    position: relative;
+    /* transition: background 1s ease; */
+}
+
+/* Star Layers */
+body.theme-dark::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100%; height: 100%;
+    background: transparent;
+    box-shadow: 
+        10px 10px 1px 1px #FFF, 
+        45px 55px 1px 1px #FFF, 
+        120px 80px 1.5px 1.5px #FFF,
+        250px 30px 1px 1px #FFF,
+        400px 150px 1.5px 1.5px #FFF;
+    opacity: 0.2;
+    z-index: -2;
+    animation: move-twinkle 200s linear infinite; 
+}
+
+/* Nebula Overlay */
+body.theme-dark::after {
+    content: "";
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: radial-gradient(circle, rgba(88, 70, 249, 0.1), transparent 70%);
+    z-index: -1;
+    animation: nebula-pulse 30s ease-in-out infinite;
+    pointer-events: none;
+}
+
+/* Prism Alert Variant (Blocked State) */
+.genesis-overlay.prism-alert .genesis-container {
+    border: 2px solid #ff4d4d;
+    box-shadow: 0 0 50px rgba(255, 77, 77, 0.4);
+    background: linear-gradient(135deg, rgba(40, 10, 10, 0.95), rgba(20, 5, 5, 0.9));
+}
+
+.genesis-overlay.prism-alert .genesis-header h2 {
+    background: linear-gradient(90deg, #ff4d4d, #ff9e9e);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.genesis-overlay.prism-alert .provocation-box {
+    border-color: #ff4d4d;
+    background: rgba(255, 77, 77, 0.1);
+}
+
+.genesis-overlay.prism-alert .provocation-box p {
+    color: #ff9e9e;
+}
+
+.alert-icon {
+    font-size: 4rem;
+    color: #ff4d4d;
+    margin-bottom: 20px;
+    animation: pulse-alert 2s infinite;
+}
+
+@keyframes pulse-alert {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Cortex Stream Enhancements */
+.notification-item.highlight {
+    color: #ffd700;
+    text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+    border-left: 2px solid #ffd700;
+    padding-left: 10px;
+    background: rgba(255, 215, 0, 0.05);
+}
+
+.notification-item.error {
+    color: #ff4d4d;
+    border-left: 2px solid #ff4d4d;
+    padding-left: 10px;
+    background: rgba(255, 77, 77, 0.05);
+}
+
+/* D3 Graph Tooltip */
+.graph-tooltip {
+    position: absolute;
+    background: rgba(13, 17, 23, 0.9);
+    border: 1px solid #58a6ff;
+    padding: 8px;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 100;
 }
