@@ -11,12 +11,21 @@ const { desktopCapturer } = require('electron');
 async function captureScreen(options = {}) {
   try {
     const sources = await desktopCapturer.getSources({ types: ['screen'] });
-    // For simplicity, we'll capture the first screen. In a real app, we'd allow selection.
+
+    // Validate sources array before accessing
+    if (!sources || sources.length === 0) {
+      throw new Error('No screen sources available. Check permissions.');
+    }
+
     const source = sources[0];
-    
-    // In a real implementation, we would use the thumbnail or capture a specific region
-    // For now, we'll return a placeholder
-    return 'placeholder_base64_image_data';
+
+    // Validate source has expected properties
+    if (!source || !source.thumbnail) {
+      throw new Error('Invalid screen source returned');
+    }
+
+    // Return the thumbnail as base64 data URL
+    return source.thumbnail.toDataURL();
   } catch (error) {
     throw new Error(`Failed to capture screen: ${error.message}`);
   }

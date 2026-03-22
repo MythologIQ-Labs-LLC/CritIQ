@@ -7,18 +7,24 @@
  * @returns {Object} Formatted data for AI consumption
  */
 function formatForAI(annotatedData) {
-  // In a real implementation, we would create a structured format that AI agents can easily understand
-  // For now, we'll return a simplified version
+  // Validate input
+  if (!annotatedData || typeof annotatedData !== 'object') {
+    throw new TypeError('annotatedData must be an object');
+  }
+
+  // Ensure notes is an array (defensive coding)
+  const notes = Array.isArray(annotatedData.notes) ? annotatedData.notes : [];
+
   return {
     type: 'annotated_screenshot',
     timestamp: new Date().toISOString(),
-    image_data: annotatedData.image,
-    notes: annotatedData.notes.map(note => ({
-      text: note.text,
-      timestamp: note.timestamp,
-      type: note.type
+    image_data: annotatedData.image || null,
+    notes: notes.map(note => ({
+      text: note.text || '',
+      timestamp: note.timestamp || new Date().toISOString(),
+      type: note.type || 'text'
     })),
-    metadata: annotatedData.metadata
+    metadata: annotatedData.metadata || {}
   };
 }
 

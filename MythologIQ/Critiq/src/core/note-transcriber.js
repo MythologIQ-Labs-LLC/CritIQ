@@ -1,15 +1,31 @@
 // src/core/note-transcriber.js
 // Voice and text input for notes
 
-const { SpeechRecognition, SpeechGrammarList } = window;
+// Feature detection for Speech Recognition API
+const SpeechRecognition = typeof window !== 'undefined'
+  ? (window.SpeechRecognition || window.webkitSpeechRecognition)
+  : null;
+
+/**
+ * Checks if speech recognition is available
+ * @returns {boolean} True if speech recognition is supported
+ */
+function isSpeechAvailable() {
+  return SpeechRecognition !== null && SpeechRecognition !== undefined;
+}
 
 /**
  * Transcribes voice input to text
  * @param {Function} onResult - Callback function to handle transcription result
  * @param {Function} onError - Callback function to handle errors
- * @returns {SpeechRecognition} The speech recognition object
+ * @returns {SpeechRecognition|null} The speech recognition object or null
  */
 function startVoiceTranscription(onResult, onError) {
+  if (!isSpeechAvailable()) {
+    if (onError) onError('Speech recognition not supported');
+    return null;
+  }
+
   const recognition = new SpeechRecognition();
   recognition.continuous = false;
   recognition.interimResults = false;
@@ -51,6 +67,7 @@ function createTextNote(text) {
 }
 
 module.exports = {
+  isSpeechAvailable,
   startVoiceTranscription,
   stopVoiceTranscription,
   createTextNote

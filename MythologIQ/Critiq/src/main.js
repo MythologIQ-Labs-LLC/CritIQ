@@ -6,6 +6,26 @@ const path = require('path');
 const { captureScreen } = require('./core/capture-engine');
 const { saveAnnotatedImage } = require('./utils/file-handler');
 
+// Security: Define allowed output directory for saved files
+const ALLOWED_OUTPUT_DIR = app.getPath('pictures');
+
+function validateOutputPath(outputPath) {
+  const resolved = path.resolve(outputPath);
+  const normalized = path.normalize(resolved);
+
+  // Prevent path traversal: must be within allowed directory
+  if (!normalized.startsWith(ALLOWED_OUTPUT_DIR)) {
+    throw new Error(`Invalid path: must be within ${ALLOWED_OUTPUT_DIR}`);
+  }
+
+  // Reject paths with traversal sequences
+  if (outputPath.includes('..')) {
+    throw new Error('Path traversal not allowed');
+  }
+
+  return normalized;
+}
+
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1200,
@@ -13,7 +33,10 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false
     }
   });
 
@@ -22,13 +45,31 @@ function createWindow() {
 
 function registerIpcHandlers() {
   ipcMain.handle('capture-screen', async () => {
-    return await captureScreen();
+    try {
+      return await captureScreen();
+    } catch (error) {
+      return { error: error.message };
+    }
   });
 
   ipcMain.handle('save-file', async (event, data, outputPath) => {
-    return await saveAnnotatedImage(data, outputPath);
+    try {
+      const safePath = validateOutputPath(outputPath);
+      return await saveAnnotatedImage(data, safePath);
+    } catch (error) {
+      return { error: error.message };
+    }
   });
 }
+
+// Global error handlers
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+});
 
 app.whenReady().then(() => {
   registerIpcHandlers();
