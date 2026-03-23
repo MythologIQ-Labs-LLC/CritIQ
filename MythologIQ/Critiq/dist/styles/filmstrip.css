@@ -1,0 +1,90 @@
+/* CritIQ — Filmstrip Styles */
+
+/* Filmstrip (Session captures) */
+.filmstrip {
+  display: none; /* Hidden by default, shown via JS when captures exist */
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.filmstrip-inner {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.filmstrip-thumb {
+  position: relative;
+  flex-shrink: 0;
+  width: 80px;
+  height: 60px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  background: var(--surface-elevated);
+  transition: border-color 150ms, transform 150ms;
+}
+
+.filmstrip-thumb:hover {
+  border-color: var(--accent-secondary);
+  transform: scale(1.05);
+}
+
+.filmstrip-thumb.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.filmstrip-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.filmstrip-thumb .thumb-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.thumb-delete {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: none;
+  line-height: 1;
+}
+
+.filmstrip-thumb:hover .thumb-delete {
+  opacity: 1;
+}
+
+.thumb-delete:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}

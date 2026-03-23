@@ -89,4 +89,95 @@ mainWindow.loadFile('index.html');
 
 ---
 
-_Shadow Genome initialized. Learn from these failures._
+## Entry #4: PROTOCOL_BYPASS
+
+**Date**: 2026-03-22T21:00:00.000Z
+**Verdict**: VETO
+**Category**: CRITICAL - Governance Violation
+
+### Pattern
+
+Implementation proceeded without running `/ql-plan` and `/ql-audit` after a sealed session, bypassing the entire Gate Tribunal process.
+
+### Evidence
+
+```
+META_LEDGER Entry #9: PROJECT SEALED (Electron architecture)
+User Request: "v2 session workflow, filmstrip, STT"
+Action Taken: Direct implementation without governance
+Result: 1376-line unauthorized Tauri implementation
+```
+
+### Impact
+
+- 33 violations accumulated
+- 15 orphan files created
+- Dual architecture conflict (Electron + Tauri)
+- Chain integrity BROKEN
+
+### Prevention
+
+- After any sealed session, new features MUST start with `/ql-plan`
+- NEVER implement without Gate Tribunal approval
+- Plan files in `.agent/plans/` are NOT substitutes for `docs/ARCHITECTURE_PLAN.md`
+
+---
+
+## Entry #5: MONOLITH_VIOLATION
+
+**Date**: 2026-03-22T21:00:00.000Z
+**Verdict**: VETO
+**Category**: Section 4 Razor Violation
+
+### Pattern
+
+Single file accumulates all application logic, violating the 250-line maximum and creating unmaintainable code.
+
+### Evidence
+
+```
+dist/app.js: 1376 lines (limit: 250)
+dist/styles.css: 934 lines (limit: 250)
+src-tauri/src/notes.rs: 345 lines (limit: 250)
+```
+
+### Prevention
+
+- Stop implementation at 200 lines, refactor into modules
+- CSS should be split by component
+- Rust modules should be focused (one concern per file)
+
+---
+
+## Entry #6: GHOST_FEATURE_TOGGLE
+
+**Date**: 2026-03-22T21:00:00.000Z
+**Verdict**: VETO
+**Category**: Ghost UI Violation
+
+### Pattern
+
+Settings UI allows users to select a feature that is hardcoded to always fail, creating false user expectations.
+
+### Evidence
+
+```javascript
+// User can select "Windows Native" STT
+<option value="native">Windows Native</option>
+
+// But backend always returns false
+pub async fn check_speech_available() -> bool {
+    SPEECH_AVAILABLE.store(false, Ordering::SeqCst);
+    false  // HARDCODED
+}
+```
+
+### Prevention
+
+- Disable or hide UI options for unimplemented features
+- Implement feature detection BEFORE adding UI toggle
+- Never expose options that silently fail
+
+---
+
+_Shadow Genome updated. 6 failure patterns documented._

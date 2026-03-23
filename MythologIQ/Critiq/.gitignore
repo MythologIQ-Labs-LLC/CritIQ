@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Agent/AI tooling
+.agent/
+.claude/
+.failsafe/
+
+# Build artifacts
+target/
+dist/*.map
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local

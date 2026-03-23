@@ -1,0 +1,227 @@
+/* CritIQ — Layout Styles */
+
+/* App Layout */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Topbar - Glassmorphism */
+#toolbar {
+  position: relative;
+  height: var(--topbar-h);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent),
+    rgba(22, 27, 46, 0.88);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  z-index: 100;
+}
+
+.toolbar-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.toolbar-group:not(:last-child)::after {
+  content: '';
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin-left: 12px;
+}
+
+.markup-tools {
+  padding: 6px 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.markup-tools::after {
+  display: none;
+}
+
+/* Main Content Area */
+#preview {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: transparent;
+  overflow: hidden;
+  position: relative;
+}
+
+#preview .placeholder {
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+#preview .placeholder::before {
+  content: '';
+  display: block;
+  width: 72px;
+  height: 72px;
+  background: var(--surface);
+  border-radius: 50%;
+  border: 2px dashed var(--border);
+}
+
+/* Canvas container */
+.canvas-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.canvas-container img {
+  max-width: 100%;
+  max-height: calc(100vh - 240px);
+  object-fit: contain;
+  border-radius: var(--radius);
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.03);
+  display: block;
+}
+
+.canvas-container canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  cursor: crosshair;
+  border-radius: var(--radius);
+}
+
+/* Notes Section - Panel Style */
+#notes {
+  padding: 16px 24px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#note-form {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+#note-form textarea {
+  flex: 1;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  resize: none;
+  transition: border-color 150ms, box-shadow 150ms;
+  line-height: 1.5;
+}
+
+#note-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+#note-form textarea::placeholder {
+  color: var(--text-muted);
+}
+
+#notes-list {
+  list-style: none;
+  margin-top: 12px;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+#notes-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: background-color 150ms;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#notes-list li:hover {
+  background: rgba(255, 255, 255, 0.02);
+  margin: 0 -8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: var(--radius-sm);
+}
+
+#notes-list li:last-child {
+  border-bottom: none;
+}
+
+.note-input-group {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.note-input-group textarea {
+  flex: 1;
+}
+
+.note-text {
+  flex: 1;
+  color: var(--text-primary);
+}
+
+.note-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.note-delete {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity 150ms, color 150ms;
+  box-shadow: none;
+}
+
+#notes-list li:hover .note-delete {
+  opacity: 1;
+}
+
+.note-delete:hover {
+  color: var(--danger);
+  background: transparent;
+  transform: none;
+}
