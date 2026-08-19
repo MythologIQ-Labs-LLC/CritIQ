@@ -103,3 +103,47 @@ fn save_error(action: &'static str) -> impl FnOnce(std::io::Error) -> SaveError 
         message: format!("Failed to {}: {}", action, error),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::write_bundle;
+    use crate::notes::{CaptureExport, Note};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn writes_ordered_storyboard_bundle() {
+        let dir = test_dir("bundle");
+        let capture = CaptureExport {
+            id: "frame-1".to_string(),
+            image: "data:image/png;base64,cG5n".to_string(),
+            notes: vec![Note {
+                text: "Keep this state".to_string(),
+                timestamp: "2026-08-19T10:00:01Z".to_string(),
+                note_type: "text".to_string(),
+            }],
+            timestamp: "2026-08-19T10:00:00Z".to_string(),
+            metadata: Some(serde_json::json!({ "screen": 1 })),
+        };
+
+        write_bundle(&[capture], &dir, "session-1", "2026-08-19T10:00:00Z").unwrap();
+
+        let manifest = fs::read_to_string(dir.join("manifest.json")).unwrap();
+        let storyboard = fs::read_to_string(dir.join("storyboard.md")).unwrap();
+        assert!(dir.join("frames/001.png").exists());
+        assert!(manifest.contains("critiq.storyboard/v1"));
+        assert!(manifest.contains("frames/001.png"));
+        assert!(storyboard.contains("Keep this state"));
+        assert!(storyboard.contains("frames/001.png"));
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    fn test_dir(label: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("critiq-{}-{}-{}", label, std::process::id(), nonce))
+    }
+}
