@@ -45,27 +45,24 @@
         <button id="settings-btn" class="btn btn-icon" title="Settings">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1-2.83 0l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
           </svg>
         </button>
       </div>
     </header>
 
     <main id="preview">
-      <p class="placeholder">Click "Capture" to take a screenshot</p>
+      <p class="placeholder">Click "Capture" to add the first storyboard frame</p>
     </main>
 
-    <!-- Filmstrip for session captures -->
     <div id="filmstrip" class="filmstrip">
-      <div class="filmstrip-inner" id="filmstrip-inner">
-        <!-- Thumbnails will be added here dynamically -->
-      </div>
+      <div class="filmstrip-inner" id="filmstrip-inner"></div>
     </div>
 
     <footer id="notes" class="panel">
       <form id="note-form">
         <div class="note-input-group">
-          <textarea placeholder="Add notes about this screenshot..." rows="2"></textarea>
+          <textarea placeholder="Add notes about this frame..." rows="2"></textarea>
           <button type="button" id="mic-btn" class="btn-mic" title="Voice note (Speech-to-Text)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
@@ -79,12 +76,10 @@
     </footer>
   </div>
 
-  <!-- Countdown overlay -->
   <div id="countdown-overlay" class="hidden">
     <span id="countdown-number">3</span>
   </div>
 
-  <!-- Settings modal -->
   <div class="modal-overlay hidden" id="settings-modal">
     <div class="modal">
       <div class="modal-header">
@@ -92,13 +87,6 @@
         <button class="modal-close" data-close-modal>&times;</button>
       </div>
       <div class="modal-body">
-        <div class="settings-row">
-          <label for="stt-engine">Speech Engine</label>
-          <select id="stt-engine" class="select">
-            <option value="webspeech">Web Speech (Browser)</option>
-            <option value="native">Windows Native</option>
-          </select>
-        </div>
         <div class="settings-row">
           <label for="auto-save">Auto-save captures</label>
           <input type="checkbox" id="auto-save">
@@ -117,25 +105,24 @@
     </div>
   </div>
 
-  <!-- Export modal -->
   <div class="modal-overlay hidden" id="export-modal">
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-title">Export Session</span>
+        <span class="modal-title">Export Storyboard</span>
         <button class="modal-close" data-close-modal>&times;</button>
       </div>
       <div class="modal-body">
         <div class="export-option">
-          <input type="radio" name="export-format" value="individual" id="export-individual" checked>
-          <label for="export-individual">Individual Images + JSON metadata</label>
+          <input type="radio" name="export-format" value="zip" id="export-zip" checked>
+          <label for="export-zip">Storyboard ZIP (recommended)</label>
         </div>
         <div class="export-option">
-          <input type="radio" name="export-format" value="zip" id="export-zip">
-          <label for="export-zip">ZIP Archive</label>
+          <input type="radio" name="export-format" value="individual" id="export-individual">
+          <label for="export-individual">Storyboard folder</label>
         </div>
         <div class="export-option">
           <input type="radio" name="export-format" value="markdown" id="export-markdown">
-          <label for="export-markdown">Markdown Report</label>
+          <label for="export-markdown">Storyboard Markdown</label>
         </div>
       </div>
       <div class="modal-footer">
