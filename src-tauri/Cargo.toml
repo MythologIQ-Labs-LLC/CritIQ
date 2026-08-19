@@ -1,7 +1,7 @@
 [package]
 name = "critiq"
 version = "1.0.0"
-description = "CritIQ - Screenshot capture and annotation tool with AI-ready metadata export"
+description = "CritIQ - User-directed UI storyboard capture with agent-ready evidence export"
 authors = ["MythologIQ"]
 license = "MIT"
 edition = "2021"
