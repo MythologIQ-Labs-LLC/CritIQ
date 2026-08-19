@@ -61,3 +61,40 @@ fn zip_error(action: &'static str) -> impl FnOnce(zip::result::ZipError) -> Save
         message: format!("Failed to {}: {}", action, error),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::write_zip;
+    use std::fs::{self, File};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use zip::ZipArchive;
+
+    #[test]
+    fn creates_portable_storyboard_archive() {
+        let root = test_dir("archive");
+        let bundle = root.join("bundle");
+        fs::create_dir_all(bundle.join("frames")).unwrap();
+        fs::write(bundle.join("storyboard.md"), "# Storyboard").unwrap();
+        fs::write(bundle.join("manifest.json"), "{}").unwrap();
+        fs::write(bundle.join("frames/001.png"), b"png").unwrap();
+
+        let archive_path = root.join("storyboard.zip");
+        write_zip(&bundle, &archive_path).unwrap();
+
+        let file = File::open(&archive_path).unwrap();
+        let mut archive = ZipArchive::new(file).unwrap();
+        assert!(archive.by_name("storyboard.md").is_ok());
+        assert!(archive.by_name("manifest.json").is_ok());
+        assert!(archive.by_name("frames/001.png").is_ok());
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    fn test_dir(label: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("critiq-{}-{}-{}", label, std::process::id(), nonce))
+    }
+}
