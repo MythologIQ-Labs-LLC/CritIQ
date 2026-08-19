@@ -23,10 +23,6 @@ const state = {
     isDrawing: false,
     startX: 0,
     startY: 0
-  },
-  settings: {
-    autoSave: localStorage.getItem('auto-save') === 'true',
-    captureFormat: localStorage.getItem('capture-format') || 'png'
   }
 };
 
