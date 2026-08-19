@@ -7,7 +7,6 @@ import { renderFilmstrip } from './filmstrip.js';
 import { undo, clearCanvas } from './markup.js';
 import { toggleRecording, renderNotes, handleNoteSubmit } from './notes.js';
 import { loadScreens, captureScreen, captureAllScreens, startRegionSelection, quickRegionCapture } from './capture.js';
-import { loadSettings, saveSettings } from './settings.js';
 import { saveAnnotatedImage, exportSession } from './export.js';
 import { setupModalHandlers, openModal } from './utils.js';
 
@@ -41,7 +40,6 @@ function handleMarkupClick(event) {
 document.addEventListener('DOMContentLoaded', () => {
   startSession();
   loadScreens();
-  loadSettings();
   setupModalHandlers();
 
   document.getElementById('toolbar')?.addEventListener('click', handleToolbarClick);
@@ -50,9 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('markup-size')?.addEventListener('input', (e) => state.markup.size = parseInt(e.target.value));
   document.getElementById('note-form')?.addEventListener('submit', handleNoteSubmit);
   document.getElementById('mic-btn')?.addEventListener('click', toggleRecording);
-  document.getElementById('settings-btn')?.addEventListener('click', () => openModal('settings-modal'));
-  document.getElementById('auto-save')?.addEventListener('change', saveSettings);
-  document.getElementById('capture-format')?.addEventListener('change', saveSettings);
   document.getElementById('export-confirm')?.addEventListener('click', exportSession);
 
   document.addEventListener('keydown', (e) => {
