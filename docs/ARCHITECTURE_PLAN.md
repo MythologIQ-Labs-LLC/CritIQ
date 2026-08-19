@@ -2,7 +2,7 @@
 
 ## Status
 
-This document describes the active CritIQ v1 architecture. Electron is no longer part of the application or an implementation target.
+This document describes the active complete local CritIQ architecture. Electron is not part of the application or an implementation target.
 
 ## Architecture decision
 
@@ -12,27 +12,30 @@ CritIQ is a local-first Tauri 2 desktop application:
 - **Backend:** Rust
 - **Frontend:** vanilla JavaScript ES modules in the WebView
 - **Capture:** `screenshots` crate
-- **Image processing:** `image` + `base64`
+- **Image processing:** HTML canvas for composition and format conversion
 - **Storyboard archive:** `zip`
-- **Session state:** in-memory for the active walkthrough
-- **Export persistence:** local filesystem only
+- **Session state:** in-memory ordered storyboard
+- **Annotation state:** structured vectors per frame
+- **Export persistence:** local filesystem
 - **Speech-to-text:** Web Speech API when available in the platform WebView
 
-No application server, account layer, database, browser automation runtime, or embedded AI inference is required.
+No application server, account layer, database, browser automation runtime, OCR service, or embedded AI inference is required.
 
 ## System boundary
 
 ```mermaid
 flowchart LR
-    U[User-controlled UI walkthrough]
-    U --> CAP[Capture]
-    CAP --> SESSION[Ordered session]
-    SESSION --> MARKUP[Frame annotations]
-    SESSION --> NOTES[Frame notes]
-    MARKUP --> PERSIST[Durable frame state]
-    NOTES --> PERSIST
-    PERSIST --> EXPORT[Storyboard export]
-    EXPORT --> ZIP[One portable ZIP]
+    U[User-controlled UI walkthrough] --> CAP[Capture]
+    CAP --> SESSION[Ordered storyboard]
+    SESSION --> VIEW[Zoom / pan]
+    SESSION --> VECTOR[Vector annotations]
+    SESSION --> NOTES[Frame + annotation notes]
+    VECTOR --> FLAT[Flattened image]
+    VECTOR --> STRUCT[Structured annotation data]
+    NOTES --> STRUCT
+    FLAT --> EXPORT[Storyboard export]
+    STRUCT --> EXPORT
+    EXPORT --> ZIP[Portable ZIP / folder / Markdown]
     ZIP --> DEV[Developer or coding agent]
 ```
 
@@ -44,17 +47,23 @@ CritIQ records what the user chooses to show. It does not autonomously navigate 
 dist/
 ├── index.html
 ├── js/
+│   ├── annotation-renderer.js
+│   ├── annotations.js
 │   ├── app.js
 │   ├── capture.js
 │   ├── export.js
 │   ├── filmstrip.js
+│   ├── markup-history.js
+│   ├── markup-preview.js
 │   ├── markup.js
 │   ├── notes.js
 │   ├── session.js
 │   ├── state.js
 │   ├── storyboard.js
 │   ├── stt.js
-│   └── utils.js
+│   ├── text-annotation.js
+│   ├── utils.js
+│   └── viewer.js
 └── styles/
     ├── base.css
     ├── buttons.css
@@ -62,89 +71,116 @@ dist/
     ├── forms.css
     ├── layout.css
     ├── modals.css
-    └── overlays.css
+    ├── overlays.css
+    └── viewer.css
 
 src-tauri/
 ├── src/
 │   ├── main.rs
 │   ├── capture/
-│   │   ├── mod.rs
-│   │   ├── multi.rs
-│   │   └── util.rs
 │   └── notes/
 │       ├── archive.rs
 │       ├── bundle.rs
 │       ├── export.rs
-│       ├── mod.rs
 │       ├── save.rs
 │       ├── types.rs
 │       └── util.rs
-├── capabilities/
-│   └── default.json
+├── capabilities/default.json
 ├── Cargo.toml
 └── tauri.conf.json
 
 tests/
+├── annotations.test.js
 └── storyboard.test.js
 ```
 
 ## Frontend responsibilities
 
-### `capture.js`
+### Capture
 
-Owns user-triggered screen and region capture and calls the Rust capture commands. Before a new frame is appended, it persists the currently active frame.
+`capture.js` owns screen and region capture. Before a new frame is appended it persists the active frame, so capturing another state cannot discard current annotations or notes.
 
-### `session.js`
+### Session and ordering
 
-Owns the ordered frame collection and active frame. Before navigation or export it persists:
+`session.js` owns the ordered frame collection and active frame. A frame persists:
 
-- frame-local notes;
+- original capture;
+- flattened annotated composite;
+- notes;
+- structured annotations;
 - capture metadata;
-- annotation canvas state;
-- the composited annotated PNG used for export.
+- thumbnail;
+- timestamp and stable ID.
 
-Frame switching must never move markup or notes between frames.
+`filmstrip.js` owns navigation, deletion, and explicit left/right sequence changes.
 
-### `markup.js`
+### Annotation model
 
-Owns the annotation canvas and compositing of the untouched capture with visible markup.
+`annotations.js` is a pure vector model. It provides cloning, bounds, hit-testing, movement, draft updates, and minimum-validity checks.
 
-### `notes.js` and `stt.js`
+Supported annotation types are:
 
-Own frame-local note entry. `stt.js` uses Web Speech only when supported by the host WebView. There is no native Rust speech engine in v1.
+```text
+pen     -> points[]
+arrow   -> x1,y1,x2,y2
+line    -> x1,y1,x2,y2
+rect    -> x1,y1,x2,y2
+ellipse -> x1,y1,x2,y2
+text    -> x,y,text,fontSize
+```
 
-### `storyboard.js`
+Every annotation also carries a stable ID, color, and size.
 
-Shapes the ordered frontend session into the narrow export contract. The annotated composite is preferred over the original screenshot.
+`annotation-renderer.js` renders those vectors to the visible markup canvas and separately flattens them with the base screenshot for Save/export. Selection indicators are never included in the flattened evidence image.
 
-### `export.js`
+`markup.js` owns pointer interaction, selection, movement, delete, clear, and orchestration. `markup-preview.js` owns preview/canvas mounting and editor visibility.
 
-Persists the active frame, shapes all frames, and invokes the Rust export boundary. It does not silently fall back to incomplete browser-only exports.
+`markup-history.js` stores annotation snapshots for undo.
+
+### Viewer
+
+`viewer.js` owns zoom and pan. View transforms never mutate capture pixels or annotation geometry.
+
+### Notes
+
+`notes.js` owns text notes and note rendering. If an annotation is selected when a note is submitted, the note stores that annotation's stable ID as `annotationId`.
+
+Deleting an annotation removes that link but preserves the note as a frame note.
+
+`stt.js` uses Web Speech only when supported. There is no native speech command surface.
+
+### Save and export
+
+`export.js`:
+
+1. saves the active flattened image as a full-resolution PNG plus JSON sidecar;
+2. persists the active frame before storyboard export;
+3. converts flattened frame images to PNG/JPEG and resizes them in the WebView when requested;
+4. shapes the ordered session through `storyboard.js`;
+5. calls the Rust filesystem/export boundary.
 
 ## Rust responsibilities
 
-### `capture/`
+### Capture
 
-Provides Tauri commands for available screens, individual screen capture, multi-screen capture, and region capture.
+`capture/` provides commands for screen enumeration, selected-screen capture, multi-screen capture, and fast captures used by region selection.
 
-### `notes/save.rs`
+### Save Frame
 
-Saves a single annotated image and its associated context.
+`notes/save.rs`:
 
-### `notes/export.rs`
+- defaults empty output requests to `Pictures/CritIQ/Saved`;
+- validates explicit output paths against the Pictures directory;
+- infers PNG/JPEG extension from the data URL;
+- preserves Save Frame at full capture resolution while storyboard export can use 100%, 75%, or 50% frame size;
+- writes the flattened image;
+- writes a JSON sidecar containing notes, structured annotations, metadata, timestamp, and image filename.
 
-Owns the export command boundary. It:
+### Storyboard export
 
-1. validates the requested export format;
-2. sanitizes the session ID before using it in filesystem paths;
-3. creates a clean export staging directory;
-4. delegates deterministic bundle creation;
-5. delegates ZIP creation when requested;
-6. removes staging files after a successful ZIP so the recommended path produces one handoff artifact.
+`notes/export.rs` validates export mode, sanitizes session IDs, creates a clean staging directory, delegates bundle creation, and delegates ZIP creation.
 
-### `notes/bundle.rs`
-
-Writes the canonical storyboard contents:
+`notes/bundle.rs` writes the canonical contents:
 
 ```text
 storyboard.md
@@ -154,99 +190,56 @@ frames/002.png
 ...
 ```
 
-### `notes/archive.rs`
+JPEG exports use `.jpg` entries instead.
 
-Packages the canonical contents into a ZIP with deterministic entry names.
+`notes/archive.rs` packages the canonical contents into a deterministic ZIP entry order.
 
 ## Storyboard data contract
 
-Each exported frame has this logical shape:
+`manifest.json` uses:
+
+```text
+critiq.storyboard/v1
+```
+
+Each frame has this logical shape:
 
 ```text
 Frame
 ├── sequence
 ├── stable id
 ├── timestamp
-├── annotated image path
+├── image path
 ├── notes[]
+│   └── optional annotationId
+├── annotations[]
 └── metadata
 ```
 
-`manifest.json` uses schema identifier:
-
-```text
-critiq.storyboard/v1
-```
-
-The ordered frame array is authoritative for sequence. The image is authoritative for visual state.
-
-## Data flow
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant WebView
-    participant Rust
-    participant Disk
-
-    User->>WebView: Capture UI state
-    WebView->>Rust: capture_* command
-    Rust-->>WebView: image + capture metadata
-    User->>WebView: Annotate and add notes
-    WebView->>WebView: Persist active frame before navigation/new capture
-    User->>WebView: Export storyboard
-    WebView->>Rust: export_session(ordered annotated frames)
-    Rust->>Disk: frames/*.png
-    Rust->>Disk: manifest.json
-    Rust->>Disk: storyboard.md
-    Rust->>Disk: critiq-session-<id>.zip
-    Rust-->>WebView: archive path
-```
+The ordered frame array is authoritative for sequence. The flattened image is authoritative for what the user visually reviewed. Structured annotations provide machine-readable geometry and relationships.
 
 ## Security and trust boundaries
 
-- Session IDs are treated as untrusted filesystem input and sanitized before path construction.
+- Session IDs are sanitized before filesystem path construction.
+- Explicit Save paths are restricted to the user's Pictures directory.
 - The application does not require shell permissions.
-- The application does not expose a native speech command surface.
-- Export remains local to the user's filesystem.
-- CritIQ does not send captured UI state to an external service as part of the core workflow.
-
-## Dependency policy
-
-Dependencies should remain minimal and task-specific. A dependency is justified only when replacing it would require fragile platform-specific or format-specific code.
-
-Current backend dependency roles:
-
-| Dependency | Purpose |
-|---|---|
-| `tauri` | Desktop runtime and command bridge |
-| `screenshots` | Cross-platform capture |
-| `image` | Image handling |
-| `base64` | WebView/Rust image transfer |
-| `serde` / `serde_json` | Export contracts |
-| `dirs` | User Pictures directory resolution |
-| `zip` | Portable storyboard archive |
-
-The frontend intentionally has no application framework dependency.
+- The application does not expose a native speech command.
+- Capture and export are local operations.
+- No captured UI state is sent to an external service by the core product.
 
 ## Validation contract
 
-A change is not considered complete merely because it compiles. Automated validation must cover:
+Automated validation must cover:
 
-- frontend unit tests;
-- `cargo check`;
+- frontend annotation-model tests;
+- frontend storyboard-contract tests;
+- `cargo check --locked`;
 - Rust unit tests;
-- Windows Tauri production build.
+- Windows Tauri production build;
+- a check that building does not mutate `Cargo.lock`.
 
-The v1 product acceptance test additionally requires a real desktop walkthrough:
-
-1. capture at least three distinct frames;
-2. annotate and note each independently;
-3. navigate among them repeatedly without state loss;
-4. export a ZIP;
-5. unpack it outside CritIQ;
-6. verify frame images, notes, metadata, and order match what the user reviewed.
+Automated validation is necessary but not sufficient. The release-candidate interaction outcome is defined in `ACCEPTANCE_TEST.md`.
 
 ## Non-goals
 
-The v1 architecture does not include browser automation, cloud sync, accounts, collaborative editing, design-system integration, OCR, video recording, plugin loading, or embedded AI inference.
+Browser automation, cloud sync, accounts, collaborative editing, OCR, video recording, design-system integration, plugin loading, and embedded AI inference are outside the current product boundary.

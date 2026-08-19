@@ -1,8 +1,7 @@
-/* CritIQ — Filmstrip Styles */
+/* CritIQ - Ordered storyboard filmstrip */
 
-/* Filmstrip (Session captures) */
 .filmstrip {
-  display: none; /* Hidden by default, shown via JS when captures exist */
+  display: none;
   gap: 8px;
   padding: 12px 20px;
   background: var(--surface);
@@ -21,8 +20,8 @@
 .filmstrip-thumb {
   position: relative;
   flex-shrink: 0;
-  width: 80px;
-  height: 60px;
+  width: 88px;
+  height: 66px;
   border-radius: var(--radius-sm);
   overflow: hidden;
   cursor: pointer;
@@ -33,7 +32,7 @@
 
 .filmstrip-thumb:hover {
   border-color: var(--accent-secondary);
-  transform: scale(1.05);
+  transform: translateY(-2px);
 }
 
 .filmstrip-thumb.active {
@@ -47,7 +46,7 @@
   object-fit: cover;
 }
 
-.filmstrip-thumb .thumb-placeholder {
+.thumb-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -58,33 +57,77 @@
   font-weight: 600;
 }
 
-.thumb-delete {
+.thumb-sequence {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 18px;
+  left: 4px;
+  top: 4px;
+  min-width: 18px;
   height: 18px;
-  border-radius: 50%;
-  background: var(--danger);
-  color: #fff;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: white;
+  background: rgba(0, 0, 0, 0.72);
   font-size: 10px;
-  border: none;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 150ms;
+  font-weight: 700;
+}
+
+.thumb-delete,
+.thumb-move {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  border: none;
+  border-radius: 5px;
+  color: white;
+  background: rgba(0, 0, 0, 0.76);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms, background 150ms;
   box-shadow: none;
   line-height: 1;
 }
 
-.filmstrip-thumb:hover .thumb-delete {
+.filmstrip-thumb:hover .thumb-delete,
+.filmstrip-thumb:hover .thumb-move,
+.filmstrip-thumb:focus-within .thumb-delete,
+.filmstrip-thumb:focus-within .thumb-move {
   opacity: 1;
 }
 
+.thumb-delete {
+  top: 4px;
+  right: 4px;
+  background: color-mix(in srgb, var(--danger) 85%, black);
+}
+
+.thumb-move {
+  bottom: 4px;
+}
+
+.thumb-move.left {
+  left: 4px;
+}
+
+.thumb-move.right {
+  right: 4px;
+}
+
 .thumb-delete:hover {
-  background: #dc2626;
-  transform: scale(1.1);
+  background: var(--danger);
+}
+
+.thumb-move:hover {
+  background: var(--accent);
+}
+
+.thumb-move:disabled {
+  opacity: 0 !important;
+  cursor: default;
 }

@@ -1,70 +1,67 @@
-# CritIQ One-Day Evolution
+# CritIQ Evolution Record
 
-## Destination
+## Original destination
 
-CritIQ should do one thing exceptionally well:
+The bounded completion cycle established the core mission:
 
 > **Turn a user-directed walkthrough of a real interface into one portable, ordered, annotated evidence bundle that a developer or coding agent can understand and act on without reconstructing the walkthrough.**
 
-This is a bounded v1 completion cycle, not a platform roadmap.
+The architectural boundary remains unchanged: Tauri 2 + Rust + vanilla JavaScript, local-first, user-directed, and intentionally without browser automation, accounts, cloud collaboration, embedded AI, OCR, video, or plugin infrastructure.
 
-## Scope
+## First completion slice
 
-### Keep
+The first slice repaired the product's evidence boundary:
 
-- Tauri 2 desktop shell.
-- Rust capture/export backend.
-- Vanilla JavaScript frontend.
-- Existing capture modes.
-- Filmstrip/session interaction model.
-- Existing markup tools.
-- Text notes and the working Web Speech path.
-- Local-first operation.
+- durable frame state;
+- annotation-preserving export;
+- deterministic `storyboard.md` and `manifest.json`;
+- real ZIP generation;
+- frame-safe deletion and capture transitions;
+- removal of fake native speech and unused shell capability;
+- repository-backed tests and Windows CI;
+- a committed, locked Rust dependency graph.
 
-### Remove or correct
+That slice proved the core storyboard architecture but intentionally left several product surfaces smaller than the original annotated-screenshot plan.
 
-- Electron-era implementation guidance.
-- Export behavior that loses annotations or frame context.
-- Fake ZIP behavior.
-- Incomplete native-speech controls.
-- Deprecated touched-code APIs.
-- Documentation that treats isolated screenshots as the product.
+## Complete local feature-set pass
 
-### Do not add
+Before desktop acceptance, the product surface was expanded to make a single full-product test meaningful.
 
-- Browser automation or autonomous navigation.
-- Accounts, auth, sync, or cloud storage.
-- Team collaboration.
-- Figma or design-system integration.
-- AI inference inside CritIQ.
-- Video recording.
-- OCR.
-- Issue tracker integration.
-- Plugin architecture.
-- A frontend framework migration.
+Added or completed:
 
-If a change is not necessary to produce or consume the storyboard, it does not belong in this cycle.
+- Select and move annotations.
+- Line and ellipse annotations.
+- Structured vector annotation persistence.
+- Annotation-linked notes.
+- Filmstrip reordering.
+- Zoom, pan, and reset-view controls.
+- Explicit New Session.
+- Functional Save Frame defaulting to `Pictures/CritIQ/Saved`.
+- PNG and JPEG output with JPEG quality selection.
+- Export image resizing at 100%, 75%, or 50%.
+- Structured annotations in Save sidecars and storyboard manifests.
+- Correct image extensions throughout bundle and Markdown generation.
+- Frontend annotation-model tests.
+- A complete feature matrix and end-to-end desktop acceptance procedure.
 
-## Framework decision
+## Current product contract
 
-Stay on **Tauri 2 + Rust + vanilla JavaScript**. Replatforming would add migration risk without improving the core storyboard workflow.
-
-## Product contract
-
-A CritIQ session is an ordered list of frames. Each frame preserves:
+Each frame preserves:
 
 ```text
 Frame
 ├── stable id
-├── sequence number
+├── sequence
 ├── timestamp
 ├── capture metadata
 ├── original capture
-├── visible annotation composite
+├── structured annotations[]
+├── flattened annotated image
 └── notes[]
+    └── optional annotationId
 ```
 
-The exported artifact must preserve the same order and visible state the user reviewed in the filmstrip.
+The flattened image is the universal visual artifact. The structured annotation array is the machine-readable semantic artifact. Both describe the same reviewed frame.
 
 ## Primary export contract
 
@@ -78,61 +75,27 @@ critiq-session-<id>.zip
     └── 003.png
 ```
 
-Every frame image is the composited annotated image. `storyboard.md` provides human-readable sequence and notes. `manifest.json` provides deterministic machine-readable context using `critiq.storyboard/v1`.
+JPEG export substitutes `.jpg` frame entries.
 
-## Implementation status
+`manifest.json` uses `critiq.storyboard/v1` and preserves authoritative sequence, frame IDs, notes, note-to-annotation relationships, vector annotations, capture metadata, and image paths.
 
-### Implemented on the active v1 branch
+## Validation contract
 
-- [x] Preserve the active frame before switching to another frame.
-- [x] Preserve the active frame before appending a new capture.
-- [x] Keep notes, metadata, canvas state, and annotated composite frame-local.
-- [x] Prevent frame deletion from cross-contaminating neighboring frame state.
-- [x] Export annotated composites rather than untouched source screenshots.
-- [x] Generate ordered `storyboard.md` and `manifest.json` from the same frame collection.
-- [x] Implement a real ZIP archive with deterministic frame names.
-- [x] Make ZIP the recommended/default handoff format.
-- [x] Remove incomplete browser-only export fallback behavior.
-- [x] Remove unfinished native Rust speech commands and UI selection.
-- [x] Remove the unused Tauri shell plugin and shell permission.
-- [x] Replace deprecated `String.prototype.substr()` usage in touched code.
-- [x] Sanitize session IDs before filesystem path construction.
-- [x] Remove obsolete Electron implementation plans.
-- [x] Make Tauri storyboard architecture canonical in the README and architecture documentation.
-- [x] Replace obsolete Electron tests with storyboard contract coverage.
-- [x] Add Rust tests for bundle generation and ZIP readability.
-- [x] Add Windows CI for frontend tests, Rust check/tests, and Tauri production build.
-
-### Automated validation
-
-The CI contract is:
+Automated validation:
 
 ```text
 npm ci
 npm test -- --run
-cargo check --manifest-path src-tauri/Cargo.toml
-cargo test --manifest-path src-tauri/Cargo.toml
+cargo check --locked --manifest-path src-tauri/Cargo.toml
+cargo test --locked --manifest-path src-tauri/Cargo.toml
 npm run build
+git diff --exit-code -- src-tauri/Cargo.lock
 ```
 
-The CI workflow also preserves the resolved `Cargo.lock` so dependency changes can be committed deterministically.
-
-### Manual acceptance still required
-
-Automated checks cannot prove the complete desktop interaction outcome. Final v1 acceptance requires a real runtime walkthrough:
-
-1. launch CritIQ;
-2. capture at least three distinct UI states;
-3. annotate and note each frame differently;
-4. navigate among the frames repeatedly;
-5. verify no annotation or note state moves or disappears;
-6. export the recommended ZIP;
-7. unpack it outside CritIQ;
-8. compare each exported frame and note with the state reviewed in the application;
-9. verify `storyboard.md` and `manifest.json` preserve the same order.
+Desktop product acceptance is defined separately in `ACCEPTANCE_TEST.md` so the entire local feature set can be evaluated in one pass.
 
 ## Definition of done
 
-CritIQ v1 is done when it reliably converts a real UI walkthrough into a portable storyboard that preserves **what the user saw, what the user marked, what the user said, and the order in which it mattered**.
+CritIQ's complete local product is done when it reliably preserves **what the user saw, what the user marked, what the user said, how those explanations relate to annotations, and the final order in which the evidence matters**.
 
-Anything beyond that is a future product decision, not unfinished v1 work.
+Anything outside the explicit non-goals is a future product-direction decision, not hidden unfinished work.

@@ -2,60 +2,90 @@
 
 > Capture the story of a UI, not just a screenshot.
 
-CritIQ is a lightweight desktop storyboard capture tool for AI-assisted UI development. It lets a user navigate a real interface, capture successive states, annotate each frame, attach notes, and export the ordered session as one portable evidence bundle.
+CritIQ is a local-first desktop storyboard capture tool for AI-assisted UI development. A user walks through a real interface, captures meaningful runtime states, annotates them, adds frame or annotation-specific notes, orders the frames, and exports the whole walkthrough as one portable evidence bundle.
 
-The user controls what becomes evidence. The developer or coding agent receives the complete story at once.
+The user controls what becomes evidence. A developer or coding agent receives the complete sequence, flattened visual evidence, structured annotations, notes, and capture metadata.
 
-## Mission
-
-**CritIQ turns a live UI walkthrough into a precise, ordered, annotated record of actual application state that a developer or coding agent can act on without repeatedly asking for screenshots or taking over the browser.**
-
-CritIQ closes a specific gap in AI-assisted UI work:
-
-- A single screenshot lacks sequence and context.
-- A pile of screenshots is laborious to create, organize, and explain.
-- Giving an agent browser control reduces the user's control over what gets observed and emphasized.
-- Design tools describe intended state, while CritIQ captures runtime state.
-
-## Core workflow
+## Complete local product workflow
 
 ```mermaid
 flowchart LR
     A[Open the real UI] --> B[Capture a meaningful state]
-    B --> C[Annotate the frame]
-    C --> D[Add text or voice notes]
-    D --> E{More context needed?}
-    E -->|Yes| A
-    E -->|No| F[Export storyboard ZIP]
-    F --> G[Hand bundle to developer or coding agent]
+    B --> C[Annotate and explain]
+    C --> D[Repeat across states]
+    D --> E[Review and reorder storyboard]
+    E --> F[Export ZIP / folder / Markdown]
+    F --> G[Developer or coding agent]
 ```
 
-A CritIQ session is an ordered storyboard. Each frame preserves its screenshot, visible annotations, notes, timestamp, and capture metadata.
+CritIQ is deliberately not a browser automation agent. It records the states the user chooses to show rather than autonomously deciding what to inspect.
 
-## Current v1 scope
+## Feature set
 
-CritIQ uses:
+### Capture
 
-- Tauri 2 for the desktop shell.
-- Rust for capture and filesystem export.
-- Vanilla JavaScript for the WebView frontend.
-- Web Speech when supported by the platform WebView for optional voice notes.
-- Local filesystem storage only.
+- primary or selected screen capture
+- all-screen capture
+- quick primary-screen region capture
+- region selection across the captured desktop
+- 0, 2, or 5 second capture delay
+- capture metadata for dimensions, timestamp, mode, screen, and region
 
-The v1 workflow includes:
+### Storyboard
 
-- full-screen, multi-screen, and region capture;
-- ordered filmstrip navigation;
-- pen, arrow, rectangle, and text markup;
-- frame-local text and voice notes;
-- durable frame state across navigation;
-- annotated storyboard export;
-- deterministic `manifest.json` and `storyboard.md` generation;
-- a real ZIP handoff artifact.
+- multiple ordered frames in one session
+- frame-local annotations and notes
+- thumbnail filmstrip
+- delete frames
+- move frames left or right to change the authoritative sequence
+- start a fresh session without restarting the application
 
-## Storyboard artifact
+### Annotation
 
-The recommended export is one ZIP archive:
+- Select and move
+- Pen
+- Arrow
+- Line
+- Rectangle
+- Ellipse
+- Text
+- color picker
+- stroke/text size
+- undo
+- delete selected annotation
+- clear annotations
+
+Annotations are stored as structured vector data for evidence export and flattened into the exported frame image for universal viewing.
+
+### Viewer
+
+- zoom in/out
+- reset view
+- pan mode
+- middle-button pan
+- Ctrl/Cmd + mouse wheel zoom
+
+### Notes
+
+- frame-level text notes
+- optional Web Speech transcription when supported by the platform WebView
+- notes can be linked to the currently selected annotation
+- deleting an annotation safely converts linked notes back to frame notes
+
+### Save and export
+
+**Save Frame** writes the active annotated frame as a full-resolution PNG plus a JSON sidecar to the user's Pictures/CritIQ/Saved directory.
+
+Storyboard export supports:
+
+- ZIP, recommended
+- unpacked storyboard folder
+- Markdown entry point
+- PNG frames, lossless
+- JPEG frames with selectable quality
+- frame resizing to 100%, 75%, or 50% for smaller handoffs
+
+The canonical storyboard bundle contains:
 
 ```text
 critiq-session-<id>.zip
@@ -67,58 +97,42 @@ critiq-session-<id>.zip
     └── 003.png
 ```
 
-Every image in `frames/` is the composited annotated frame the user reviewed in CritIQ, rather than the untouched source capture.
+JPEG export uses `.jpg` frame names instead.
 
-`storyboard.md` provides the human-readable sequence. `manifest.json` provides deterministic machine-readable context using the `critiq.storyboard/v1` schema.
+`manifest.json` uses `critiq.storyboard/v1` and preserves ordered frame IDs, notes, annotation links, vector annotation data, capture metadata, and image paths.
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|---|---|
+| V | Select |
+| P | Pen |
+| A | Arrow |
+| L | Line |
+| R | Rectangle |
+| E | Ellipse |
+| T | Text |
+| Delete / Backspace | Delete selected annotation |
+| Ctrl/Cmd + Z | Undo |
+| Ctrl/Cmd + S | Save active frame |
+| Ctrl/Cmd + E | Export storyboard |
+| Ctrl/Cmd + + / - | Zoom |
+| Ctrl/Cmd + 0 | Reset view |
 
 ## Architecture
 
-```mermaid
-flowchart TB
-    subgraph Frontend[WebView frontend]
-        CAP[capture.js]
-        SES[session.js]
-        MARK[markup.js]
-        NOTES[notes.js + stt.js]
-        FILM[filmstrip.js]
-        SHAPE[storyboard.js]
-        EXP[export.js]
-    end
+CritIQ uses:
 
-    subgraph Backend[Tauri / Rust]
-        RCAP[capture/]
-        REXP[notes/export.rs]
-        BUNDLE[notes/bundle.rs]
-        ARCHIVE[notes/archive.rs]
-        SAVE[notes/save.rs]
-    end
+- Tauri 2 for the desktop shell
+- Rust for capture, filesystem output, bundle generation, and ZIP packaging
+- vanilla JavaScript ES modules in the WebView
+- structured vector annotations rendered onto an HTML canvas
+- Web Speech only when supported
+- local filesystem storage only
 
-    CAP --> RCAP
-    CAP --> SES
-    SES --> FILM
-    SES <--> MARK
-    SES <--> NOTES
-    SES --> SHAPE
-    SHAPE --> EXP
-    EXP --> REXP
-    REXP --> BUNDLE
-    REXP --> ARCHIVE
-    MARK --> SAVE
-```
+There is no application server, account layer, cloud sync, browser automation runtime, or embedded AI inference.
 
-The architecture deliberately has no application server, database, account system, cloud sync, browser automation, or embedded AI inference.
-
-## Explicit non-goals
-
-CritIQ v1 is not:
-
-- a general-purpose image editor;
-- a screen recorder or video editor;
-- a browser automation agent;
-- a design-system or Figma replacement;
-- a cloud collaboration platform;
-- an AI coding agent;
-- a plugin platform.
+See [docs/ARCHITECTURE_PLAN.md](docs/ARCHITECTURE_PLAN.md) for the implementation contract and [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md) for the complete product surface.
 
 ## Development
 
@@ -129,7 +143,7 @@ CritIQ v1 is not:
 - Rust stable toolchain
 - Tauri 2 platform prerequisites
 
-### Run locally
+### Run
 
 ```bash
 npm ci
@@ -140,24 +154,31 @@ npm run dev
 
 ```bash
 npm test -- --run
-cargo check --manifest-path src-tauri/Cargo.toml
-cargo test --manifest-path src-tauri/Cargo.toml
-```
-
-### Build
-
-```bash
+cargo check --locked --manifest-path src-tauri/Cargo.toml
+cargo test --locked --manifest-path src-tauri/Cargo.toml
 npm run build
 ```
 
-The repository CI runs the same validation plus a Windows Tauri production build.
+CI performs the same validation on Windows and publishes the Tauri bundle.
 
-## Acceptance target
+## Product acceptance
 
-CritIQ v1 is ready when a three-frame walkthrough can be captured, independently annotated and noted, navigated without state loss, exported as a ZIP, unpacked outside CritIQ, and understood in the original sequence.
+Use [docs/ACCEPTANCE_TEST.md](docs/ACCEPTANCE_TEST.md) for the single end-to-end test pass. It exercises capture modes, frame ordering, all annotation tools, annotation-linked notes, zoom/pan, Save Frame, PNG/JPEG export, output resizing, and bundle verification.
 
-See [`docs/ONE_DAY_EVOLUTION.md`](docs/ONE_DAY_EVOLUTION.md) for the bounded implementation and acceptance plan, and [`docs/ARCHITECTURE_PLAN.md`](docs/ARCHITECTURE_PLAN.md) for the current architecture contract.
+A green CI build proves compilation and automated contracts. The desktop acceptance pass proves that the actual interaction model works as a product.
+
+## Non-goals
+
+CritIQ is not:
+
+- a browser automation agent
+- a screen recorder or video editor
+- a cloud collaboration platform
+- a design-system or Figma replacement
+- an OCR pipeline
+- an embedded AI coding agent
+- a plugin platform
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+MIT. See [LICENSE](LICENSE).

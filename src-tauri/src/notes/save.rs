@@ -1,86 +1,83 @@
-// Notes module — Save operations
+// Notes module - Save operations
 
 use super::types::{AIFormattedData, AnnotatedData, Note, SaveError, SaveResult};
 use super::util::{get_iso_timestamp, strip_base64_prefix};
 use base64::Engine;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Component, PathBuf};
 
-/// Validates that the output path is within the Pictures directory
 fn validate_output_path(output_dir: &str) -> Result<PathBuf, SaveError> {
     let pictures_dir = dirs::picture_dir().ok_or_else(|| SaveError {
         message: "Could not determine Pictures directory".to_string(),
     })?;
 
-    let requested_path = PathBuf::from(output_dir);
-    let canonical_path = requested_path.canonicalize().unwrap_or(requested_path.clone());
+    if output_dir.trim().is_empty() {
+        return Ok(pictures_dir.join("CritIQ").join("Saved"));
+    }
 
-    // Security: Ensure path is within Pictures directory
-    if !canonical_path.starts_with(&pictures_dir) {
+    let requested = PathBuf::from(output_dir);
+    if !requested.is_absolute() {
         return Err(SaveError {
-            message: format!(
-                "Invalid path: must be within {}",
-                pictures_dir.display()
-            ),
+            message: "Output path must be absolute".to_string(),
         });
     }
 
-    // Reject path traversal attempts
-    if output_dir.contains("..") {
+    if requested
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
+    {
         return Err(SaveError {
             message: "Path traversal not allowed".to_string(),
         });
     }
 
-    Ok(canonical_path)
+    if !requested.starts_with(&pictures_dir) {
+        return Err(SaveError {
+            message: format!("Invalid path: must be within {}", pictures_dir.display()),
+        });
+    }
+
+    Ok(requested)
 }
 
-/// Saves annotated image and notes to disk
 #[tauri::command]
 pub async fn save_annotated_image(
     data: AnnotatedData,
     output_dir: String,
 ) -> Result<SaveResult, SaveError> {
     let safe_path = validate_output_path(&output_dir)?;
-
-    // Create output directory if it doesn't exist
-    fs::create_dir_all(&safe_path).map_err(|e| SaveError {
-        message: format!("Failed to create directory: {}", e),
+    fs::create_dir_all(&safe_path).map_err(|error| SaveError {
+        message: format!("Failed to create directory: {}", error),
     })?;
 
     let timestamp = get_iso_timestamp();
-    let file_timestamp = timestamp.replace([':', '-'], "").replace('.', "_")[..15].to_string();
+    let file_timestamp = timestamp
+        .replace([':', '-'], "")
+        .replace('.', "_")
+        .trim_end_matches('Z')
+        .to_string();
+    let extension = image_extension(&data.image);
 
-    // Save image (strip data URL prefix if present)
-    let image_filename = format!("critiq_{}.png", file_timestamp);
-    let image_path = safe_path.join(&image_filename);
-
-    let image_data = strip_base64_prefix(&data.image);
-
-    let decoded = base64::engine::general_purpose::STANDARD
-        .decode(image_data)
-        .map_err(|e| SaveError {
-            message: format!("Failed to decode image: {}", e),
-        })?;
-
-    fs::write(&image_path, decoded).map_err(|e| SaveError {
-        message: format!("Failed to write image: {}", e),
+    let image_path = safe_path.join(format!("critiq_{}.{}", file_timestamp, extension));
+    let decoded = decode_image(&data.image)?;
+    fs::write(&image_path, decoded).map_err(|error| SaveError {
+        message: format!("Failed to write image: {}", error),
     })?;
 
-    // Save notes as JSON
-    let notes_filename = format!("critiq_{}_notes.json", file_timestamp);
-    let notes_path = safe_path.join(&notes_filename);
-
-    let notes_json = serde_json::json!({
+    let notes_path = safe_path.join(format!("critiq_{}_notes.json", file_timestamp));
+    let sidecar = serde_json::json!({
         "notes": data.notes,
+        "annotations": data.annotations,
         "metadata": data.metadata,
         "timestamp": timestamp,
+        "image": image_path.file_name().map(|name| name.to_string_lossy().to_string()),
     });
 
-    fs::write(&notes_path, serde_json::to_string_pretty(&notes_json).unwrap()).map_err(|e| {
-        SaveError {
-            message: format!("Failed to write notes: {}", e),
-        }
+    let json = serde_json::to_string_pretty(&sidecar).map_err(|error| SaveError {
+        message: format!("Failed to serialize notes: {}", error),
+    })?;
+    fs::write(&notes_path, json).map_err(|error| SaveError {
+        message: format!("Failed to write notes: {}", error),
     })?;
 
     Ok(SaveResult {
@@ -89,18 +86,44 @@ pub async fn save_annotated_image(
     })
 }
 
-/// Formats annotated data for AI consumption
+fn decode_image(image: &str) -> Result<Vec<u8>, SaveError> {
+    base64::engine::general_purpose::STANDARD
+        .decode(strip_base64_prefix(image))
+        .map_err(|error| SaveError {
+            message: format!("Failed to decode image: {}", error),
+        })
+}
+
+pub(crate) fn image_extension(image: &str) -> &'static str {
+    if image.starts_with("data:image/jpeg") || image.starts_with("data:image/jpg") {
+        "jpg"
+    } else {
+        "png"
+    }
+}
+
 #[tauri::command]
 pub fn format_for_ai(data: AnnotatedData) -> AIFormattedData {
     let timestamp = get_iso_timestamp();
+    let notes = normalize_notes(&data.notes, &timestamp);
 
-    let notes: Vec<Note> = data
-        .notes
+    AIFormattedData {
+        data_type: "annotated_screenshot".to_string(),
+        timestamp,
+        image_data: (!data.image.is_empty()).then_some(data.image),
+        notes,
+        annotations: data.annotations,
+        metadata: data.metadata,
+    }
+}
+
+fn normalize_notes(notes: &[Note], timestamp: &str) -> Vec<Note> {
+    notes
         .iter()
         .map(|note| Note {
             text: note.text.clone(),
             timestamp: if note.timestamp.is_empty() {
-                timestamp.clone()
+                timestamp.to_string()
             } else {
                 note.timestamp.clone()
             },
@@ -109,18 +132,18 @@ pub fn format_for_ai(data: AnnotatedData) -> AIFormattedData {
             } else {
                 note.note_type.clone()
             },
+            annotation_id: note.annotation_id.clone(),
         })
-        .collect();
+        .collect()
+}
 
-    AIFormattedData {
-        data_type: "annotated_screenshot".to_string(),
-        timestamp,
-        image_data: if data.image.is_empty() {
-            None
-        } else {
-            Some(data.image)
-        },
-        notes,
-        metadata: data.metadata,
+#[cfg(test)]
+mod tests {
+    use super::image_extension;
+
+    #[test]
+    fn infers_frame_extension_from_data_url() {
+        assert_eq!(image_extension("data:image/png;base64,abc"), "png");
+        assert_eq!(image_extension("data:image/jpeg;base64,abc"), "jpg");
     }
 }
