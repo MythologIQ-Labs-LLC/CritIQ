@@ -7,6 +7,8 @@ function updatePreview(imageData) {
   const container = document.getElementById('preview');
   if (!container || !imageData) return;
 
+  setCanvas(null, null);
+  setBaseImage(null);
   container.innerHTML = '';
 
   const canvasContainer = document.createElement('div');
@@ -40,8 +42,10 @@ function updatePreview(imageData) {
 
 function clearPreview() {
   const container = document.getElementById('preview');
+  setCanvas(null, null);
+  setBaseImage(null);
   if (container) {
-    container.innerHTML = '<p class="placeholder">Click "Capture" to take a screenshot</p>';
+    container.innerHTML = '<p class="placeholder">Click "Capture" to add the first storyboard frame</p>';
   }
   document.getElementById('save-btn').disabled = true;
   document.getElementById('markup-tools').style.display = 'none';
@@ -71,7 +75,7 @@ function getCanvasCoords(e) {
 }
 
 function handleMouseDown(e) {
-  const { canvas, ctx } = getCanvas();
+  const { ctx } = getCanvas();
   const { x, y } = getCanvasCoords(e);
   state.markup.isDrawing = true;
   state.markup.startX = x;
@@ -105,7 +109,7 @@ function handleMouseMove(e) {
   }
 }
 
-function handleMouseUp(e) {
+function handleMouseUp() {
   if (!state.markup.isDrawing) return;
   const { ctx } = getCanvas();
   state.markup.isDrawing = false;
@@ -206,6 +210,7 @@ function restoreCanvasState() {
 
 function undo() {
   const { canvas, ctx } = getCanvas();
+  if (!canvas || !ctx) return;
   if (state.markup.history.length > 1) {
     state.markup.history.pop();
     restoreCanvasState();
@@ -217,7 +222,7 @@ function undo() {
 
 function clearCanvas() {
   const { canvas, ctx } = getCanvas();
-  if (!ctx) return;
+  if (!canvas || !ctx) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   state.markup.history = [];
 }
