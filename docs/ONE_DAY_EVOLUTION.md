@@ -20,7 +20,7 @@ This work is intentionally constrained to a single bounded implementation cycle.
 - Existing capture modes.
 - Existing filmstrip/session model.
 - Existing markup tools.
-- Existing text and speech-to-text notes.
+- Existing text notes and working speech-to-text path.
 - Local-first operation.
 
 ### Remove or correct
@@ -28,7 +28,9 @@ This work is intentionally constrained to a single bounded implementation cycle.
 - Electron-era implementation guidance that no longer reflects the repository.
 - Export paths that imply capabilities they do not provide.
 - Any export behavior that loses annotations or frame-specific context.
+- UI controls for unfinished native speech functionality unless that implementation is completed inside the cycle.
 - Documentation that treats isolated screenshots as the product instead of the ordered storyboard.
+- Trivial deprecated API usage discovered during the touched-code pass.
 
 ### Do not add
 
@@ -45,6 +47,12 @@ This work is intentionally constrained to a single bounded implementation cycle.
 - A frontend framework migration.
 
 If a proposed change is not necessary to produce or consume the storyboard bundle, it does not belong in the one-day scope.
+
+## Framework decision
+
+Stay on **Tauri 2 + Rust + vanilla JavaScript**.
+
+Tauri 2 is the active architecture in the repository and remains the current major Tauri line. Replatforming again would add migration risk without improving the storyboard workflow. The modernization pass should therefore focus on correctness, misleading dead paths, dependency hygiene, and deprecated APIs rather than changing frameworks.
 
 ## The product contract
 
@@ -183,7 +191,20 @@ Only if trivial within the cycle:
 
 These are secondary. Do not jeopardize export correctness for them.
 
-### 5. Remove archaeological confusion
+### 5. Run a bounded modernization pass
+
+**Goal:** remove misleading or deprecated implementation details without turning the work into a rewrite.
+
+- Keep Tauri 2 and the existing Rust/vanilla-JS split.
+- Update locked Tauri 2 dependencies within the compatible v2 line if validation remains green.
+- Replace deprecated JavaScript APIs in touched code, including `String.prototype.substr()` in ID generation.
+- Audit touched Rust dependencies for straightforward compatible updates rather than major-version migrations.
+- Remove the selectable "Windows Native" speech option for v1 unless native recognition is actually implemented; the current Rust path is a stub and should not masquerade as a finished feature.
+- Prefer the working speech path rather than expanding the platform-specific STT surface during this cycle.
+
+**Done when:** the supported UI exposes only functionality that works, touched code uses non-deprecated APIs, and dependency updates introduce no test or build regression.
+
+### 6. Remove archaeological confusion
 
 **Goal:** repository documentation describes the application that actually exists.
 
@@ -208,6 +229,8 @@ The implementation is finished when all of the following are true:
 - [ ] ZIP export produces an actual archive rather than a directory.
 - [ ] The exported ZIP can be unpacked and understood without the CritIQ application.
 - [ ] No Electron runtime or Electron implementation guidance remains active.
+- [ ] No unfinished native-speech control is presented as a working feature.
+- [ ] Touched JavaScript contains no deprecated `substr()` usage.
 - [ ] `npm test` passes.
 - [ ] `cargo check` passes.
 - [ ] `npm run build` succeeds on the supported development platform.
