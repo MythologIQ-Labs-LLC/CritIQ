@@ -4,7 +4,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: critiq-ci-${{ github.event.pull_request.number }}
@@ -14,10 +14,8 @@ jobs:
   validate:
     runs-on: windows-latest
     steps:
-      - name: Check out pull request branch
+      - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -34,35 +32,18 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Check Rust backend
-        run: cargo check --manifest-path src-tauri/Cargo.toml
+      - name: Check locked Rust backend
+        run: cargo check --locked --manifest-path src-tauri/Cargo.toml
 
-      - name: Run Rust tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Run locked Rust tests
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
 
       - name: Build Tauri application
         run: npm run build
 
-      - name: Commit resolved Cargo lockfile
+      - name: Verify build did not mutate Cargo lockfile
         shell: bash
-        run: |
-          git add src-tauri/Cargo.lock
-          if git diff --cached --quiet; then
-            echo "Cargo.lock already matches Cargo.toml"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Update Cargo lockfile"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
-
-      - name: Preserve resolved Cargo lockfile
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cargo-lock
-          path: src-tauri/Cargo.lock
-          if-no-files-found: error
+        run: git diff --exit-code -- src-tauri/Cargo.lock
 
       - name: Preserve Windows application bundle
         if: success()
