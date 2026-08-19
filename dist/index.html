@@ -42,7 +42,6 @@
       <div class="toolbar-group">
         <button data-tool="export" id="export-btn" class="btn btn-secondary" disabled>Export</button>
         <button data-tool="save" id="save-btn" class="btn btn-accent" disabled>Save</button>
-        <button id="settings-btn" class="btn btn-secondary" title="Settings">Settings</button>
       </div>
     </header>
 
@@ -73,31 +72,6 @@
 
   <div id="countdown-overlay" class="hidden">
     <span id="countdown-number">3</span>
-  </div>
-
-  <div class="modal-overlay hidden" id="settings-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <span class="modal-title">Settings</span>
-        <button class="modal-close" data-close-modal>&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="settings-row">
-          <label for="auto-save">Auto-save captures</label>
-          <input type="checkbox" id="auto-save">
-        </div>
-        <div class="settings-row">
-          <label for="capture-format">Capture format</label>
-          <select id="capture-format" class="select">
-            <option value="png">PNG (Lossless)</option>
-            <option value="jpeg">JPEG (Smaller)</option>
-          </select>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" data-close-modal>Close</button>
-      </div>
-    </div>
   </div>
 
   <div class="modal-overlay hidden" id="export-modal">
