@@ -51,7 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('note-form')?.addEventListener('submit', handleNoteSubmit);
   document.getElementById('mic-btn')?.addEventListener('click', toggleRecording);
   document.getElementById('settings-btn')?.addEventListener('click', () => openModal('settings-modal'));
-  document.getElementById('stt-engine')?.addEventListener('change', saveSettings);
   document.getElementById('auto-save')?.addEventListener('change', saveSettings);
   document.getElementById('capture-format')?.addEventListener('change', saveSettings);
   document.getElementById('export-confirm')?.addEventListener('click', exportSession);
@@ -60,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.ctrlKey || e.metaKey) {
       if (e.key === 's') { e.preventDefault(); if (!document.getElementById('save-btn').disabled) saveAnnotatedImage(); }
       else if (e.key === 'z') { e.preventDefault(); undo(); }
-      else if (e.key === 'e') { e.preventDefault(); openModal('export-modal'); }
+      else if (e.key === 'e') { e.preventDefault(); if (!document.getElementById('export-btn').disabled) openModal('export-modal'); }
     }
   });
 
