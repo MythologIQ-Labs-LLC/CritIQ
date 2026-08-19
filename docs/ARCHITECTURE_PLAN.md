@@ -1,268 +1,252 @@
-# Architecture Plan: CritIQ v2 (Tauri)
+# CritIQ Architecture
 
-## Risk Grade: L2
+## Status
 
-### Risk Assessment
+This document describes the active CritIQ v1 architecture. Electron is no longer part of the application or an implementation target.
 
-- [ ] Contains security/auth logic -> L3
-- [x] Modifies existing APIs -> L2 (architecture migration)
-- [ ] UI-only changes -> L1
+## Architecture decision
 
-**Note**: Elevated from L1 due to architecture transition from Electron to Tauri.
+CritIQ is a local-first Tauri 2 desktop application:
 
----
+- **Desktop shell:** Tauri 2
+- **Backend:** Rust
+- **Frontend:** vanilla JavaScript ES modules in the WebView
+- **Capture:** `screenshots` crate
+- **Image processing:** `image` + `base64`
+- **Storyboard archive:** `zip`
+- **Persistence:** local filesystem and localStorage only
+- **Speech-to-text:** Web Speech API when available in the platform WebView
 
-## Architecture Decision
+No application server, account layer, database, browser automation runtime, or embedded AI inference is required.
 
-**Framework**: Tauri 2 (Rust backend + WebView frontend)
-**Deprecated**: Electron (`src/` directory - MARKED FOR DELETION)
+## System boundary
 
-### Rationale
-
-- Native Rust performance for screen capture operations
-- Smaller binary size compared to Electron
-- Better Windows integration for speech recognition
-- Single codebase for desktop deployment
-
----
-
-## File Tree (The Contract)
-
+```mermaid
+flowchart LR
+    U[User-controlled UI walkthrough]
+    U --> CAP[Capture]
+    CAP --> SESSION[Ordered session]
+    SESSION --> MARKUP[Frame annotations]
+    SESSION --> NOTES[Frame notes]
+    MARKUP --> PERSIST[Durable frame state]
+    NOTES --> PERSIST
+    PERSIST --> EXPORT[Storyboard export]
+    EXPORT --> ZIP[One portable ZIP]
+    ZIP --> DEV[Developer or coding agent]
 ```
+
+CritIQ records what the user chooses to show. It does not autonomously navigate or decide what evidence matters.
+
+## Source tree contract
+
+```text
 dist/
-|-- index.html               (WebView entry point)
-|-- styles/
-|   |-- base.css             (Theme variables, resets)
-|   |-- layout.css           (Structural layout)
-|   |-- components.css       (UI component styles)
-|   |-- filmstrip.css        (Filmstrip navigation styles)
-|-- js/
-|   |-- app.js               (Main orchestrator, <50 lines)
-|   |-- session.js           (Session state management)
-|   |-- capture.js           (Screen capture handlers)
-|   |-- filmstrip.js         (Thumbnail navigation)
-|   |-- markup.js            (Canvas drawing tools)
-|   |-- notes.js             (Note input and STT)
-|   |-- settings.js          (User preferences)
-|   |-- export.js            (Export functionality)
-|   |-- utils.js             (Shared utilities)
+├── index.html
+├── js/
+│   ├── app.js
+│   ├── capture.js
+│   ├── export.js
+│   ├── filmstrip.js
+│   ├── markup.js
+│   ├── notes.js
+│   ├── session.js
+│   ├── settings.js
+│   ├── state.js
+│   ├── storyboard.js
+│   ├── stt.js
+│   └── utils.js
+└── styles/
+    ├── base.css
+    ├── buttons.css
+    ├── filmstrip.css
+    ├── forms.css
+    ├── layout.css
+    ├── modals.css
+    └── overlays.css
 
 src-tauri/
-|-- src/
-|   |-- main.rs              (Tauri entry point, <50 lines)
-|   |-- capture.rs           (Screen capture commands) [278 lines - SPLIT REQUIRED]
-|   |-- notes/
-|   |   |-- mod.rs           (Notes module orchestrator)
-|   |   |-- types.rs         (Data structures)
-|   |   |-- save.rs          (Save operations)
-|   |   |-- format.rs        (AI formatting)
-|   |   |-- export.rs        (Session export)
-|   |-- speech.rs            (STT integration) [107 lines - OK]
-|-- Cargo.toml
-|-- tauri.conf.json
-
-docs/
-|-- ARCHITECTURE_PLAN.md     (This file)
-|-- META_LEDGER.md           (Audit chain)
-|-- SHADOW_GENOME.md         (Failure patterns)
-|-- CONCEPT.md               (Product vision)
+├── src/
+│   ├── main.rs
+│   ├── capture/
+│   │   ├── mod.rs
+│   │   ├── multi.rs
+│   │   └── util.rs
+│   └── notes/
+│       ├── archive.rs
+│       ├── bundle.rs
+│       ├── export.rs
+│       ├── mod.rs
+│       ├── save.rs
+│       ├── types.rs
+│       └── util.rs
+├── capabilities/
+│   └── default.json
+├── Cargo.toml
+└── tauri.conf.json
 
 tests/
-|-- js/
-|   |-- session.test.js      (Session management tests)
-|   |-- filmstrip.test.js    (Filmstrip UI tests)
-|-- rust/
-|   (Rust tests embedded in modules)
+└── storyboard.test.js
 ```
 
-### Files to DELETE (Electron Deprecation)
+## Frontend responsibilities
 
-```
-DELETE: src/main.js
-DELETE: src/preload.js
-DELETE: src/renderer.js
-DELETE: src/core/event-bus.js
-DELETE: src/core/capture-engine.js
-DELETE: src/core/markup-manager.js
-DELETE: src/core/note-transcriber.js
-DELETE: src/core/metadata-injector.js
-DELETE: src/ui/main-window.js
-DELETE: src/ui/markup-toolbar.js
-DELETE: src/ui/screenshot-preview.js
-DELETE: src/ui/note-input-panel.js
-DELETE: src/utils/file-handler.js
-DELETE: src/utils/image-processor.js
-DELETE: src/utils/ai-formatter.js
-DELETE: index.html (root - replaced by dist/index.html)
-DELETE: styles.css (root - replaced by dist/styles/)
-DELETE: tests/event-bus.test.js
-```
+### `capture.js`
 
----
+Owns user-triggered screen and region capture and calls the Rust capture commands.
 
-## Interface Contracts
+### `session.js`
 
-### Frontend Modules
+Owns the ordered frame collection and active frame. Before navigation or export it persists:
 
-#### session.js
-- **Input**: Capture events, user actions
-- **Output**: Session state object
-- **Functions**: `startSession()`, `addCapture()`, `switchCapture()`, `getActiveCapture()`
+- frame-local notes;
+- capture metadata;
+- annotation canvas state;
+- the composited annotated PNG used for export.
 
-#### capture.js
-- **Input**: User capture triggers (button, hotkey)
-- **Output**: Image data to session
-- **Functions**: `captureScreen()`, `captureRegion()`, `showRegionSelector()`
-- **Calls**: Tauri `capture_screen`, `capture_region`, `capture_all_screens`
+Frame switching must never move markup or notes between frames.
 
-#### filmstrip.js
-- **Input**: Session captures array, user selection
-- **Output**: Thumbnail navigation UI
-- **Functions**: `renderFilmstrip()`, `selectThumbnail()`, `generateThumbnail()`
+### `markup.js`
 
-#### markup.js
-- **Input**: Canvas element, user drawing actions
-- **Output**: Annotated image data
-- **Functions**: `initCanvas()`, `setTool()`, `draw()`, `undo()`, `clear()`
+Owns the annotation canvas and compositing of the untouched capture with visible markup.
 
-#### notes.js
-- **Input**: Text/voice input, STT engine selection
-- **Output**: Note entries with timestamps
-- **Functions**: `addNote()`, `startSTT()`, `stopSTT()`, `getNotes()`
-- **STT Engines**: Web Speech API (primary), Windows Native (future)
+### `notes.js` and `stt.js`
 
-#### settings.js
-- **Input**: User preferences
-- **Output**: localStorage persistence
-- **Functions**: `loadSettings()`, `saveSettings()`, `getSetting()`
+Own frame-local note entry. `stt.js` uses Web Speech only when supported by the host WebView. There is no native Rust speech engine in v1.
 
-#### export.js
-- **Input**: Session data, export format selection
-- **Output**: Exported files via Tauri backend
-- **Functions**: `exportSession()`, `showExportModal()`
-- **Formats**: Individual files, Markdown report, ZIP archive
+### `storyboard.js`
 
-### Backend Commands (Rust)
+Shapes the ordered frontend session into the narrow export contract. The annotated composite is preferred over the original screenshot.
 
-#### capture.rs
-- `get_screens()` -> `Vec<ScreenInfo>`
-- `capture_screen(index?)` -> `CaptureResult`
-- `capture_screen_fast(index?)` -> `CaptureResult` (JPEG for overlay)
-- `capture_all_screens()` -> `CaptureResult`
-- `capture_all_screens_fast()` -> `CaptureResult`
-- `capture_region(options)` -> `CaptureResult`
+### `export.js`
 
-#### notes/mod.rs
-- `save_annotated_image(data, output_dir)` -> `SaveResult`
-- `format_for_ai(data)` -> `AIFormattedData`
-- `export_session(captures, format, session_id)` -> `ExportResult`
+Persists the active frame, shapes all frames, and invokes the Rust export boundary. It does not silently fall back to incomplete browser-only exports.
 
-#### speech.rs
-- `check_speech_available()` -> `bool`
-- `start_speech_recognition(app)` -> `Result<(), SpeechError>`
-- `stop_speech_recognition()` -> `Result<(), SpeechError>`
+## Rust responsibilities
 
----
+### `capture/`
 
-## Data Flow
+Provides Tauri commands for available screens, individual screen capture, multi-screen capture, and region capture.
 
-```
-[User Action]
-    -> [capture.js]
-    -> [Tauri: capture.rs]
-    -> [session.js: addCapture()]
-    -> [filmstrip.js: renderFilmstrip()]
+### `notes/save.rs`
 
-[Markup Action]
-    -> [markup.js: draw()]
-    -> [session.js: updateCapture()]
+Saves a single annotated image and its associated context.
 
-[Note Action]
-    -> [notes.js: addNote() or STT]
-    -> [session.js: addNoteToCapture()]
+### `notes/export.rs`
 
-[Export Action]
-    -> [export.js: exportSession()]
-    -> [Tauri: notes/export.rs]
-    -> [File System]
+Owns the export command boundary. It:
+
+1. validates the requested export format;
+2. sanitizes the session ID before using it in filesystem paths;
+3. creates a clean export staging directory;
+4. delegates deterministic bundle creation;
+5. delegates ZIP creation when requested;
+6. removes staging files after a successful ZIP so the recommended path produces one handoff artifact.
+
+### `notes/bundle.rs`
+
+Writes the canonical storyboard contents:
+
+```text
+storyboard.md
+manifest.json
+frames/001.png
+frames/002.png
+...
 ```
 
----
+### `notes/archive.rs`
 
-## Dependencies
+Packages the canonical contents into a ZIP with deterministic entry names.
 
-### Rust (Cargo.toml)
+## Storyboard data contract
 
-| Crate       | Justification                              | Vanilla Alternative          |
-|-------------|--------------------------------------------|-----------------------------|
-| tauri       | Core framework                             | N/A                         |
-| screenshots | Screen capture                             | FFI to native APIs          |
-| base64      | Image encoding                             | Manual impl (error-prone)   |
-| serde       | Serialization                              | Manual JSON parsing         |
-| serde_json  | JSON handling                              | Manual parsing              |
-| dirs        | System directories                         | Env vars (platform-specific)|
+Each exported frame has this logical shape:
 
-**REMOVE**: `chrono` - Replace with `std::time::SystemTime` for timestamps
+```text
+Frame
+├── sequence
+├── stable id
+├── timestamp
+├── annotated image path
+├── notes[]
+└── metadata
+```
 
-### Frontend
+`manifest.json` uses schema identifier:
 
-| Dependency  | Justification                              | Vanilla Alternative          |
-|-------------|--------------------------------------------|-----------------------------|
-| None        | Vanilla JS only                            | N/A                         |
+```text
+critiq.storyboard/v1
+```
 
----
+The ordered frame array is authoritative for sequence. The image is authoritative for visual state.
 
-## Section 4 Razor Pre-Check
+## Data flow
 
-### Current Violations (to be remediated)
+```mermaid
+sequenceDiagram
+    participant User
+    participant WebView
+    participant Rust
+    participant Disk
 
-| File                 | Lines | Limit | Status           |
-|---------------------|-------|-------|------------------|
-| dist/app.js         | 1376  | 250   | SPLIT INTO 8 FILES |
-| dist/styles.css     | 934   | 250   | SPLIT INTO 4 FILES |
-| src-tauri/capture.rs| 278   | 250   | SPLIT INTO 2 FILES |
-| src-tauri/notes.rs  | 346   | 250   | SPLIT INTO 4 FILES |
+    User->>WebView: Capture UI state
+    WebView->>Rust: capture_* command
+    Rust-->>WebView: image + capture metadata
+    User->>WebView: Annotate and add notes
+    WebView->>WebView: Persist active frame before navigation
+    User->>WebView: Export storyboard
+    WebView->>Rust: export_session(ordered annotated frames)
+    Rust->>Disk: frames/*.png
+    Rust->>Disk: manifest.json
+    Rust->>Disk: storyboard.md
+    Rust->>Disk: critiq-session-<id>.zip
+    Rust-->>WebView: archive path
+```
 
-### Post-Modularization Targets
+## Security and trust boundaries
 
-- [x] All planned functions <= 40 lines
-- [x] All planned files <= 250 lines
-- [x] No planned nesting > 3 levels
+- Session IDs are treated as untrusted filesystem input and sanitized before path construction.
+- The application does not require shell permissions.
+- The application does not expose a native speech command surface.
+- Export remains local to the user's filesystem.
+- CritIQ does not send captured UI state to an external service as part of the core workflow.
 
----
+## Dependency policy
 
-## Implementation Phases
+Dependencies should remain minimal and task-specific. A dependency is justified only when replacing it would require fragile platform-specific or format-specific code.
 
-### Phase 1: Electron Cleanup
-1. Delete all files in `src/` directory (15 files)
-2. Delete root `index.html` and `styles.css`
-3. Delete `tests/event-bus.test.js`
-4. Update `.gitignore` if needed
+Current backend dependency roles:
 
-### Phase 2: Frontend Modularization
-1. Split `dist/app.js` (1376 lines) into 8 modules
-2. Split `dist/styles.css` (934 lines) into 4 stylesheets
-3. Update `dist/index.html` to load modules
+| Dependency | Purpose |
+|---|---|
+| `tauri` | Desktop runtime and command bridge |
+| `screenshots` | Cross-platform capture |
+| `image` | Image handling |
+| `base64` | WebView/Rust image transfer |
+| `serde` / `serde_json` | Export contracts |
+| `dirs` | User Pictures directory resolution |
+| `zip` | Portable storyboard archive |
 
-### Phase 3: Backend Modularization
-1. Split `capture.rs` into `capture/mod.rs`, `capture/multi.rs`
-2. Split `notes.rs` into `notes/mod.rs`, `notes/types.rs`, `notes/save.rs`, `notes/export.rs`
-3. Remove `chrono` dependency, use `SystemTime`
+The frontend intentionally has no application framework dependency.
 
-### Phase 4: Ghost UI Remediation
-1. Either implement Windows Speech or remove native option from UI
-2. Verify all UI toggles connect to real functionality
+## Validation contract
 
----
+A change is not considered complete merely because it compiles. Automated validation must cover:
 
-## MythIQ Theme Alignment
+- frontend unit tests;
+- `cargo check`;
+- Rust unit tests;
+- Windows Tauri production build.
 
-- Dark mode primary: `#0a0a1a` (background)
-- Accent purple: `#6366f1` (primary actions)
-- Accent cyan: `#06b6d4` (secondary/highlights)
-- Glass effect: `rgba(255, 255, 255, 0.05)` backdrop blur
-- Border glow: `box-shadow: 0 0 20px rgba(99, 102, 241, 0.3)`
+The v1 product acceptance test additionally requires a real desktop walkthrough:
 
----
+1. capture at least three distinct frames;
+2. annotate and note each independently;
+3. navigate among them repeatedly without state loss;
+4. export a ZIP;
+5. unpack it outside CritIQ;
+6. verify frame images, notes, metadata, and order match what the user reviewed.
 
-_Blueprint created. Awaiting GATE tribunal via /ql-audit._
+## Non-goals
+
+The v1 architecture does not include browser automation, cloud sync, accounts, collaborative editing, design-system integration, OCR, video recording, plugin loading, or embedded AI inference.
