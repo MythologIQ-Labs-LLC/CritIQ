@@ -70,6 +70,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_TAG: v1.0.0-rc.1
           SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
