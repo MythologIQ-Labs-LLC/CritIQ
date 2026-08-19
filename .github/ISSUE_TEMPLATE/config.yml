@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/MythologIQ-Labs-LLC/CritIQ/security
+    about: Use the repository Security surface for sensitive vulnerability reporting.
+  - name: CritIQ documentation
+    url: https://github.com/MythologIQ-Labs-LLC/CritIQ/tree/main/docs
+    about: Review product, architecture, governance, and acceptance documentation before filing an issue.
