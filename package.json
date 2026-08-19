@@ -15,8 +15,16 @@
     "ai-assisted-development",
     "rust"
   ],
-  "author": "MythologIQ",
+  "author": "MythologIQ Labs LLC",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MythologIQ-Labs-LLC/CritIQ.git"
+  },
+  "homepage": "https://github.com/MythologIQ-Labs-LLC/CritIQ#readme",
+  "bugs": {
+    "url": "https://github.com/MythologIQ-Labs-LLC/CritIQ/issues"
+  },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
     "vitest": "^1.0.0"

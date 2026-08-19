@@ -1,0 +1,9 @@
+# CritIQ repository stewardship
+* @Knapp-Kevin
+
+# Governance and security surfaces require explicit maintainer ownership
+/GOVERNANCE.md @Knapp-Kevin
+/SECURITY.md @Knapp-Kevin
+/.github/ @Knapp-Kevin
+/src-tauri/ @Knapp-Kevin
+/docs/adr/ @Knapp-Kevin

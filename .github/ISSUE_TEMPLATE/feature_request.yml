@@ -1,0 +1,54 @@
+name: Feature request
+description: Propose an improvement or explicit product-boundary change.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Start with the user problem. CritIQ is intentionally small, so browser automation, cloud services, OCR, video, embedded AI, collaboration, integrations, and plugins are product-boundary proposals rather than routine additions.
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: What is difficult today, and for whom?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the behavior or outcome without assuming a specific implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope classification
+      options:
+        - Fits current CritIQ boundary
+        - May change an existing contract
+        - Expands the current product boundary
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence or examples
+      description: Link examples, workflows, or reproducible pain points when available.
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Tradeoffs or risks
+      description: Consider complexity, privacy, maintenance, compatibility, and user control.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I reviewed the product boundary in README.md and GOVERNANCE.md.
+          required: true
+        - label: I searched existing issues for similar requests.
+          required: true

@@ -1,0 +1,77 @@
+name: Bug report
+description: Report reproducible CritIQ behavior that is incorrect.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve CritIQ. Do not include credentials, private customer screenshots, or security exploit details here. Security-sensitive findings belong in SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: CritIQ version
+      description: Release/tag or commit if running from source.
+      placeholder: v1.0.0-rc.1
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 24H2
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Installation or launch
+        - Capture
+        - Storyboard
+        - Annotation
+        - Viewer
+        - Notes / speech
+        - Save
+        - Export
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest reliable reproduction.
+      placeholder: |
+        1. Launch CritIQ
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Safe supporting evidence
+      description: Error text or synthetic screenshots only. Remove secrets and private data.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched existing issues for the same defect.
+          required: true
+        - label: I removed credentials, customer data, and other sensitive information.
+          required: true
