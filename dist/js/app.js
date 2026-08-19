@@ -9,7 +9,7 @@ import {
   renderMarkup,
   undo
 } from './markup.js';
-import { renderNoteTarget, toggleRecording, handleNoteSubmit } from './notes.js';
+import { initSTT, renderNoteTarget, toggleRecording, handleNoteSubmit } from './notes.js';
 import {
   captureAllScreens,
   captureScreen,
@@ -82,6 +82,15 @@ function handleViewClick(event) {
   else if (view === 'zoom-in') zoomBy(0.1);
   else if (view === 'zoom-out') zoomBy(-0.1);
   else if (view === 'reset') resetViewport();
+}
+
+function setupSpeechAvailability() {
+  const micButton = document.getElementById('mic-btn');
+  if (!micButton) return;
+
+  const available = initSTT();
+  micButton.hidden = !available;
+  micButton.setAttribute('aria-hidden', available ? 'false' : 'true');
 }
 
 function setupPreferences() {
@@ -181,6 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupModalHandlers();
   setupViewport();
   setupPreferences();
+  setupSpeechAvailability();
 
   document.getElementById('toolbar')?.addEventListener('click', handleToolbarClick);
   document.getElementById('markup-tools')?.addEventListener('click', handleMarkupClick);

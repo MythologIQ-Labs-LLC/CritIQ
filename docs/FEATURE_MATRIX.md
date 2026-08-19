@@ -31,7 +31,7 @@ This is the authoritative checklist for the complete local desktop product surfa
 | Viewer | Pan | Implemented | Pan mode + middle-button pan |
 | Viewer | Reset view | Implemented | Button + Ctrl/Cmd+0 |
 | Notes | Frame notes | Implemented | Text note list |
-| Notes | Web Speech | Implemented when supported | Browser/WebView capability dependent |
+| Notes | Web Speech | Implemented when supported | Microphone control is hidden when the WebView lacks Web Speech |
 | Notes | Annotation-linked notes | Implemented | Selected annotation ID captured in note |
 | Save | Save active frame | Implemented | Full-resolution PNG + JSON sidecar |
 | Save | Safe default directory | Implemented | Pictures/CritIQ/Saved |

@@ -68,7 +68,7 @@ Annotations are stored as structured vector data for evidence export and flatten
 ### Notes
 
 - frame-level text notes
-- optional Web Speech transcription when supported by the platform WebView
+- optional Web Speech transcription when supported by the platform WebView; the microphone control stays hidden when unsupported
 - notes can be linked to the currently selected annotation
 - deleting an annotation safely converts linked notes back to frame notes
 
