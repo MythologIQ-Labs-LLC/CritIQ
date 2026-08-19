@@ -6,6 +6,15 @@ CritIQ is a local-first desktop storyboard capture tool for AI-assisted UI devel
 
 The user controls what becomes evidence. A developer or coding agent receives the complete sequence, flattened visual evidence, structured annotations, notes, and capture metadata.
 
+## Install
+
+Validated Windows installers are published as durable GitHub Release assets in this repository after the complete CI pipeline passes. The release candidate tag is `v1.0.0-rc.1` and includes both:
+
+- `CritIQ_1.0.0_x64-setup.exe` for normal interactive installation;
+- `CritIQ_1.0.0_x64_en-US.msi` for MSI-based deployment.
+
+Use the EXE for ordinary installation unless MSI packaging is specifically required. GitHub Actions artifacts are retained as build evidence, but the repository Release is the canonical installer distribution surface.
+
 ## Complete local product workflow
 
 ```mermaid
@@ -159,7 +168,7 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml
 npm run build
 ```
 
-CI performs the same validation on Windows and publishes the Tauri bundle.
+CI performs the same validation on Windows, preserves the build artifact, and publishes the validated EXE/MSI as repository Release assets.
 
 ## Product acceptance
 
