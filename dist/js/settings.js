@@ -3,24 +3,16 @@
 import { state } from './state.js';
 
 function loadSettings() {
-  const sttSelect = document.getElementById('stt-engine');
   const autoSave = document.getElementById('auto-save');
   const captureFormat = document.getElementById('capture-format');
 
-  if (sttSelect) sttSelect.value = state.settings.sttEngine;
   if (autoSave) autoSave.checked = state.settings.autoSave;
   if (captureFormat) captureFormat.value = state.settings.captureFormat;
 }
 
 function saveSettings() {
-  const sttSelect = document.getElementById('stt-engine');
   const autoSave = document.getElementById('auto-save');
   const captureFormat = document.getElementById('capture-format');
-
-  if (sttSelect) {
-    state.settings.sttEngine = sttSelect.value;
-    localStorage.setItem('stt-engine', sttSelect.value);
-  }
 
   if (autoSave) {
     state.settings.autoSave = autoSave.checked;
@@ -33,7 +25,4 @@ function saveSettings() {
   }
 }
 
-export {
-  loadSettings,
-  saveSettings
-};
+export { loadSettings, saveSettings };
