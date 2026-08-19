@@ -2,7 +2,7 @@ use super::archive;
 use super::bundle;
 use super::types::{CaptureExport, ExportResult, SaveError};
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 
 #[tauri::command]
 pub async fn export_session(
@@ -32,6 +32,9 @@ pub async fn export_session(
         "zip" => {
             let archive_path = root.join(format!("critiq-session-{}.zip", safe_id));
             archive::write_zip(&export_dir, &archive_path)?;
+            fs::remove_dir_all(&export_dir).map_err(|error| SaveError {
+                message: format!("ZIP created but staging cleanup failed: {}", error),
+            })?;
             archive_path
         }
         _ => unreachable!(),
@@ -53,7 +56,7 @@ fn validate_format(format: &str) -> Result<(), SaveError> {
     })
 }
 
-fn reset_export_dir(export_dir: &PathBuf) -> Result<(), SaveError> {
+fn reset_export_dir(export_dir: &Path) -> Result<(), SaveError> {
     if export_dir.exists() {
         fs::remove_dir_all(export_dir).map_err(|error| SaveError {
             message: format!("Failed to reset export directory: {}", error),
