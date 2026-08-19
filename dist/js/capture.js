@@ -1,7 +1,7 @@
 // CritIQ - Screen Capture Module
 
 import { invoke, state } from './state.js';
-import { addCaptureToSession } from './session.js';
+import { addCaptureToSession, persistActiveCapture } from './session.js';
 import { updatePreview } from './markup.js';
 import { renderNotes } from './notes.js';
 import { showNotification, showCountdown } from './utils.js';
@@ -45,6 +45,7 @@ async function captureScreen() {
       result = await invoke('capture_screen', { screenIndex: parseInt(screenValue) });
     }
 
+    persistActiveCapture();
     addCaptureToSession(result.image, {
       width: result.width,
       height: result.height,
@@ -71,6 +72,7 @@ async function captureAllScreens() {
 
     const result = await invoke('capture_all_screens');
 
+    persistActiveCapture();
     addCaptureToSession(result.image, {
       width: result.width,
       height: result.height,
@@ -212,12 +214,14 @@ function cropAndAddToSession(imageData, x, y, width, height) {
     cropCtx.drawImage(img, x, y, width, height, 0, 0, width, height);
 
     const croppedImage = cropCanvas.toDataURL('image/png');
+    const timestamp = new Date().toISOString();
 
-    addCaptureToSession(croppedImage, { width, height, timestamp: new Date().toISOString() });
+    persistActiveCapture();
+    addCaptureToSession(croppedImage, { width, height, timestamp });
 
     state.currentImage = croppedImage;
     state.originalImage = croppedImage;
-    state.metadata = { width, height, timestamp: new Date().toISOString() };
+    state.metadata = { width, height, timestamp };
     state.markup.history = [];
     state.notes = [];
     updatePreview(croppedImage);
