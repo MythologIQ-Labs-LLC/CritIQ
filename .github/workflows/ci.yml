@@ -52,3 +52,40 @@ jobs:
           name: critiq-windows-bundle
           path: src-tauri/target/release/bundle/**
           if-no-files-found: error
+
+  publish-release-candidate:
+    needs: validate
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download validated Windows bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: critiq-windows-bundle
+          path: installers
+
+      - name: Publish repository release candidate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: v1.0.0-rc.1
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mapfile -t assets < <(find installers -type f \( -name '*.exe' -o -name '*.msi' \) -print | sort)
+          if [ "${#assets[@]}" -lt 2 ]; then
+            echo "Expected both EXE and MSI installers, found ${#assets[@]}" >&2
+            exit 1
+          fi
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release delete "$RELEASE_TAG" --yes --cleanup-tag
+          fi
+
+          gh release create "$RELEASE_TAG" "${assets[@]}" \
+            --target "$SOURCE_SHA" \
+            --title "CritIQ 1.0.0 Release Candidate" \
+            --notes "Windows acceptance candidate built and validated by CI from source commit $SOURCE_SHA. Includes both the NSIS setup executable and MSI installer." \
+            --prerelease
