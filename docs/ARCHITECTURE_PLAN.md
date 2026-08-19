@@ -14,7 +14,8 @@ CritIQ is a local-first Tauri 2 desktop application:
 - **Capture:** `screenshots` crate
 - **Image processing:** `image` + `base64`
 - **Storyboard archive:** `zip`
-- **Persistence:** local filesystem and localStorage only
+- **Session state:** in-memory for the active walkthrough
+- **Export persistence:** local filesystem only
 - **Speech-to-text:** Web Speech API when available in the platform WebView
 
 No application server, account layer, database, browser automation runtime, or embedded AI inference is required.
@@ -50,7 +51,6 @@ dist/
 │   ├── markup.js
 │   ├── notes.js
 │   ├── session.js
-│   ├── settings.js
 │   ├── state.js
 │   ├── storyboard.js
 │   ├── stt.js
@@ -92,7 +92,7 @@ tests/
 
 ### `capture.js`
 
-Owns user-triggered screen and region capture and calls the Rust capture commands.
+Owns user-triggered screen and region capture and calls the Rust capture commands. Before a new frame is appended, it persists the currently active frame.
 
 ### `session.js`
 
@@ -193,7 +193,7 @@ sequenceDiagram
     WebView->>Rust: capture_* command
     Rust-->>WebView: image + capture metadata
     User->>WebView: Annotate and add notes
-    WebView->>WebView: Persist active frame before navigation
+    WebView->>WebView: Persist active frame before navigation/new capture
     User->>WebView: Export storyboard
     WebView->>Rust: export_session(ordered annotated frames)
     Rust->>Disk: frames/*.png
