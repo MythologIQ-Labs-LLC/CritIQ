@@ -3,7 +3,6 @@
 
 const { invoke } = window.__TAURI__.core;
 
-// Session state
 const session = {
   id: null,
   captures: [],
@@ -11,7 +10,6 @@ const session = {
   created: null
 };
 
-// Application state
 const state = {
   currentImage: null,
   originalImage: null,
@@ -27,13 +25,11 @@ const state = {
     startY: 0
   },
   settings: {
-    sttEngine: localStorage.getItem('stt-engine') || 'webspeech',
     autoSave: localStorage.getItem('auto-save') === 'true',
     captureFormat: localStorage.getItem('capture-format') || 'png'
   }
 };
 
-// DOM element references (set during init)
 let canvas = null;
 let ctx = null;
 let baseImage = null;
@@ -56,7 +52,7 @@ function getBaseImage() {
 }
 
 function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
 export {
