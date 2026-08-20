@@ -1,9 +1,11 @@
-// CritIQ - Session Management Module
+// CritIQ - Storyboard session management
 
-import { session, state, generateId, getCanvas } from './state.js';
+import { session, state, generateId } from './state.js';
+import { cloneAnnotations } from './annotations.js';
 import { renderFilmstrip, generateThumbnail, updateExportButton } from './filmstrip.js';
-import { updatePreview, clearPreview } from './markup.js';
+import { updatePreview, clearPreview, getCompositeImage, loadAnnotations } from './markup.js';
 import { renderNotes } from './notes.js';
+import { resetViewport } from './viewer.js';
 import { showNotification } from './utils.js';
 
 function startSession() {
@@ -16,62 +18,73 @@ function startSession() {
   showNotification('New session started');
 }
 
+function resetSession() {
+  clearPreview();
+  resetViewport();
+  startSession();
+}
+
 function addCaptureToSession(imageData, metadata = {}) {
   const capture = {
     id: generateId(),
     image: imageData,
+    compositeImage: imageData,
     thumbnail: null,
     notes: [],
-    markup: null,
+    annotations: [],
     timestamp: new Date().toISOString(),
     metadata
   };
 
-  generateThumbnail(imageData).then(thumb => {
-    capture.thumbnail = thumb;
+  generateThumbnail(imageData).then((thumbnail) => {
+    capture.thumbnail = thumbnail;
     renderFilmstrip();
   });
 
   session.captures.push(capture);
   session.activeIndex = session.captures.length - 1;
-
   renderFilmstrip();
   updateExportButton();
-
   return capture;
+}
+
+function persistActiveCapture() {
+  const index = session.activeIndex;
+  if (index < 0 || index >= session.captures.length) return;
+
+  const current = session.captures[index];
+  current.notes = state.notes.map((note) => ({ ...note }));
+  current.metadata = { ...(state.metadata || {}) };
+  current.annotations = cloneAnnotations(state.markup.annotations);
+
+  const composite = getCompositeImage('png');
+  if (!composite) return;
+
+  current.compositeImage = composite;
+  generateThumbnail(composite).then((thumbnail) => {
+    current.thumbnail = thumbnail;
+    renderFilmstrip();
+  });
 }
 
 function switchCapture(index) {
   if (index < 0 || index >= session.captures.length) return;
+  if (index === session.activeIndex) return;
 
-  const { canvas, ctx } = getCanvas();
-
-  if (session.activeIndex >= 0 && session.activeIndex < session.captures.length && canvas) {
-    const current = session.captures[session.activeIndex];
-    current.markup = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    current.notes = [...state.notes];
-  }
-
+  persistActiveCapture();
   session.activeIndex = index;
-  const capture = session.captures[index];
+  activateCapture(session.captures[index]);
+}
 
+function activateCapture(capture) {
   state.currentImage = capture.image;
   state.originalImage = capture.image;
-  state.notes = [...capture.notes];
-  state.metadata = capture.metadata || {};
-  state.markup.history = [];
+  state.notes = capture.notes.map((note) => ({ ...note }));
+  state.metadata = { ...(capture.metadata || {}) };
 
+  resetViewport();
   updatePreview(capture.image);
-
-  if (capture.markup && canvas) {
-    setTimeout(() => {
-      const { ctx } = getCanvas();
-      if (ctx && capture.markup) {
-        ctx.putImageData(capture.markup, 0, 0);
-      }
-    }, 100);
-  }
-
+  loadAnnotations(capture.annotations || []);
   renderNotes();
   renderFilmstrip();
 }
@@ -79,25 +92,51 @@ function switchCapture(index) {
 function removeCapture(index) {
   if (index < 0 || index >= session.captures.length) return;
 
+  const activeIndex = session.activeIndex;
+  const removingActive = activeIndex === index;
   session.captures.splice(index, 1);
 
   if (session.captures.length === 0) {
     session.activeIndex = -1;
     clearPreview();
-  } else if (session.activeIndex >= session.captures.length) {
-    session.activeIndex = session.captures.length - 1;
-    switchCapture(session.activeIndex);
-  } else if (session.activeIndex === index) {
+  } else if (removingActive) {
+    session.activeIndex = -1;
     switchCapture(Math.min(index, session.captures.length - 1));
+  } else if (index < activeIndex) {
+    session.activeIndex = activeIndex - 1;
   }
 
   renderFilmstrip();
   updateExportButton();
 }
 
+function moveCapture(index, direction) {
+  const target = index + direction;
+  if (
+    index < 0 ||
+    index >= session.captures.length ||
+    target < 0 ||
+    target >= session.captures.length
+  ) {
+    return;
+  }
+
+  persistActiveCapture();
+  [session.captures[index], session.captures[target]] =
+    [session.captures[target], session.captures[index]];
+
+  if (session.activeIndex === index) session.activeIndex = target;
+  else if (session.activeIndex === target) session.activeIndex = index;
+
+  renderFilmstrip();
+}
+
 export {
-  startSession,
   addCaptureToSession,
-  switchCapture,
-  removeCapture
+  moveCapture,
+  persistActiveCapture,
+  removeCapture,
+  resetSession,
+  startSession,
+  switchCapture
 };

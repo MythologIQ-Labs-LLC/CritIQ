@@ -1,9 +1,7 @@
-// CritIQ - Shared State Module
-// Centralized state management for the application
+// CritIQ - Shared application state
 
 const { invoke } = window.__TAURI__.core;
 
-// Session state
 const session = {
   id: null,
   captures: [],
@@ -11,7 +9,6 @@ const session = {
   created: null
 };
 
-// Application state
 const state = {
   currentImage: null,
   originalImage: null,
@@ -21,30 +18,42 @@ const state = {
     tool: 'pen',
     color: '#6366f1',
     size: 4,
+    annotations: [],
     history: [],
+    selectedId: null,
+    draft: null,
     isDrawing: false,
+    dragX: 0,
+    dragY: 0,
+    dragMoved: false
+  },
+  viewport: {
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    panMode: false,
+    isPanning: false,
     startX: 0,
     startY: 0
   },
-  settings: {
-    sttEngine: localStorage.getItem('stt-engine') || 'webspeech',
-    autoSave: localStorage.getItem('auto-save') === 'true',
-    captureFormat: localStorage.getItem('capture-format') || 'png'
+  preferences: {
+    imageFormat: 'png',
+    jpegQuality: 90,
+    imageScale: 100
   }
 };
 
-// DOM element references (set during init)
 let canvas = null;
 let ctx = null;
 let baseImage = null;
 
-function setCanvas(c, context) {
-  canvas = c;
+function setCanvas(nextCanvas, context) {
+  canvas = nextCanvas;
   ctx = context;
 }
 
-function setBaseImage(img) {
-  baseImage = img;
+function setBaseImage(image) {
+  baseImage = image;
 }
 
 function getCanvas() {
@@ -56,7 +65,7 @@ function getBaseImage() {
 }
 
 function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
 export {

@@ -1,6 +1,6 @@
 # Contributing to CritIQ
 
-CritIQ is a small local-first desktop project for capturing and communicating user-directed UI evidence. Contributions are welcome when they improve that product clearly and preserve its trust and scope boundaries.
+CritIQ is a small local-first desktop product for capturing ordered, annotated UI evidence. Contributions are welcome when they improve that product clearly and preserve its trust boundaries.
 
 By intentionally submitting a contribution for inclusion in this repository, you agree that the contribution is submitted under the repository's MIT License unless a separate written agreement explicitly applies.
 
@@ -8,16 +8,16 @@ Participation is also subject to `CODE_OF_CONDUCT.md`. Repository decision right
 
 ## Before contributing
 
-For the current default branch, read:
+Read these in order:
 
 1. `README.md`
 2. `docs/README.md`
 3. `docs/CONCEPT.md`
 4. `docs/ARCHITECTURE_PLAN.md`
-5. `docs/adr/README.md`
+5. `docs/FEATURE_MATRIX.md`
 6. `GOVERNANCE.md`
 
-The complete local desktop release candidate is tracked in PR #8. Its additional feature-matrix and acceptance-test documents become current repository authority only when that work lands on `main`.
+For release-affecting work, also read `docs/ACCEPTANCE_TEST.md`.
 
 ## Product-boundary rule
 
@@ -69,46 +69,87 @@ Frontend code lives in `dist/js` as vanilla JavaScript ES modules. Rust/Tauri co
 
 The architecture intentionally avoids a frontend framework and application server. Do not introduce either without an accepted architectural reason.
 
+Use the existing modules rather than creating parallel state systems.
+
 Important boundaries:
 
 ```text
 capture -> session -> annotation/notes -> export
+                    -> viewer
 ```
 
-State ownership should remain explicit. Filesystem-facing input must remain sanitized. Changes should not create duplicate or competing architecture paths.
+Frame-local state must remain frame-local. Export order must follow storyboard order. Structured annotation data and flattened exported visuals must describe the same authored state.
 
 ## Code quality
 
 Prefer small modules with one clear responsibility.
 
-The repository historically uses a 250-line code ceiling as a maintenance signal. It is not a magical law, but exceeding it should trigger a deliberate decomposition review rather than casual growth.
+The repository historically uses a 250-line code ceiling as a maintenance signal. It is not a magical law of software physics, but exceeding it should trigger a deliberate decomposition review rather than casual growth.
 
 For touched code:
 
 - use supported APIs;
 - remove dead paths exposed by the change;
 - avoid duplicate state ownership;
-- preserve accessibility behavior;
+- preserve accessibility labels and keyboard behavior;
 - keep filesystem-facing input sanitized;
+- keep comments about why, not obvious narration of what;
 - update documentation when behavior or contracts change.
 
 ## Contract changes
 
-Changes to save/export formats, ordering, annotation representation, note linking, filenames, or filesystem behavior require compatibility analysis.
+The storyboard export is a consumer-facing contract.
 
-The target storyboard contract is recorded in `docs/adr/ADR-003-storyboard-evidence-contract.md`. Do not silently redefine a published contract once consumers can depend on it.
+Changes to any of the following require explicit compatibility analysis:
+
+- `critiq.storyboard/v1` semantics;
+- manifest fields;
+- frame ordering;
+- annotation representation;
+- note linking;
+- filenames or extensions;
+- save/export directory behavior.
+
+If a change breaks existing consumers, propose a contract-version decision rather than silently changing v1 semantics.
 
 ## Validation
 
-Run the checks appropriate to the branch and files you change. Do not describe an unrun check as passing.
+Run the relevant checks before requesting review:
 
-For the active release candidate, validation requirements are maintained in PR #8 and its CI workflow. Once that work lands, those checks become the default branch standard.
+```bash
+npm test -- --run
+cargo check --locked --manifest-path src-tauri/Cargo.toml
+cargo test --locked --manifest-path src-tauri/Cargo.toml
+npm run build
+git diff --exit-code -- src-tauri/Cargo.lock
+```
+
+Use the smallest sufficient validation for editorial-only changes, but do not describe an unrun test as passing.
+
+For release-affecting changes, the Windows production build and the applicable desktop acceptance flow are part of the evidence boundary.
+
+## Tests
+
+Tests should assert contracts and failure modes rather than merely execute lines.
+
+Useful targets include:
+
+- frame isolation;
+- annotation persistence;
+- ordering;
+- structured export;
+- file-format handling;
+- path sanitization;
+- archive readability;
+- compatibility between flattened and structured evidence.
+
+When a defect is reproducible in a pure function or boundary layer, add a regression test.
 
 ## Generated binaries
 
 Do not commit generated EXE/MSI installers into ordinary Git source history.
 
-Validated installers belong in GitHub Releases. CI artifacts exist as build evidence and workflow transport.
+Validated installers belong in GitHub Releases. CI artifacts exist as build evidence and temporary workflow transport.
 
 ## Pull requests
 
@@ -120,6 +161,8 @@ A good PR answers four questions:
 4. **What remains unproven?**
 
 Keep PRs bounded. Separate unrelated cleanup when it obscures the actual consequence.
+
+The repository PR template includes the required evidence and authority checklist.
 
 ## Documentation changes
 

@@ -1,268 +1,245 @@
-# Architecture Plan: CritIQ v2 (Tauri)
+# CritIQ Architecture
 
-## Risk Grade: L2
+## Status
 
-### Risk Assessment
+This document describes the active complete local CritIQ architecture. Electron is not part of the application or an implementation target.
 
-- [ ] Contains security/auth logic -> L3
-- [x] Modifies existing APIs -> L2 (architecture migration)
-- [ ] UI-only changes -> L1
+## Architecture decision
 
-**Note**: Elevated from L1 due to architecture transition from Electron to Tauri.
+CritIQ is a local-first Tauri 2 desktop application:
 
----
+- **Desktop shell:** Tauri 2
+- **Backend:** Rust
+- **Frontend:** vanilla JavaScript ES modules in the WebView
+- **Capture:** `screenshots` crate
+- **Image processing:** HTML canvas for composition and format conversion
+- **Storyboard archive:** `zip`
+- **Session state:** in-memory ordered storyboard
+- **Annotation state:** structured vectors per frame
+- **Export persistence:** local filesystem
+- **Speech-to-text:** Web Speech API when available in the platform WebView
 
-## Architecture Decision
+No application server, account layer, database, browser automation runtime, OCR service, or embedded AI inference is required.
 
-**Framework**: Tauri 2 (Rust backend + WebView frontend)
-**Deprecated**: Electron (`src/` directory - MARKED FOR DELETION)
+## System boundary
 
-### Rationale
-
-- Native Rust performance for screen capture operations
-- Smaller binary size compared to Electron
-- Better Windows integration for speech recognition
-- Single codebase for desktop deployment
-
----
-
-## File Tree (The Contract)
-
+```mermaid
+flowchart LR
+    U[User-controlled UI walkthrough] --> CAP[Capture]
+    CAP --> SESSION[Ordered storyboard]
+    SESSION --> VIEW[Zoom / pan]
+    SESSION --> VECTOR[Vector annotations]
+    SESSION --> NOTES[Frame + annotation notes]
+    VECTOR --> FLAT[Flattened image]
+    VECTOR --> STRUCT[Structured annotation data]
+    NOTES --> STRUCT
+    FLAT --> EXPORT[Storyboard export]
+    STRUCT --> EXPORT
+    EXPORT --> ZIP[Portable ZIP / folder / Markdown]
+    ZIP --> DEV[Developer or coding agent]
 ```
+
+CritIQ records what the user chooses to show. It does not autonomously navigate or decide what evidence matters.
+
+## Source tree contract
+
+```text
 dist/
-|-- index.html               (WebView entry point)
-|-- styles/
-|   |-- base.css             (Theme variables, resets)
-|   |-- layout.css           (Structural layout)
-|   |-- components.css       (UI component styles)
-|   |-- filmstrip.css        (Filmstrip navigation styles)
-|-- js/
-|   |-- app.js               (Main orchestrator, <50 lines)
-|   |-- session.js           (Session state management)
-|   |-- capture.js           (Screen capture handlers)
-|   |-- filmstrip.js         (Thumbnail navigation)
-|   |-- markup.js            (Canvas drawing tools)
-|   |-- notes.js             (Note input and STT)
-|   |-- settings.js          (User preferences)
-|   |-- export.js            (Export functionality)
-|   |-- utils.js             (Shared utilities)
+├── index.html
+├── js/
+│   ├── annotation-renderer.js
+│   ├── annotations.js
+│   ├── app.js
+│   ├── capture.js
+│   ├── export.js
+│   ├── filmstrip.js
+│   ├── markup-history.js
+│   ├── markup-preview.js
+│   ├── markup.js
+│   ├── notes.js
+│   ├── session.js
+│   ├── state.js
+│   ├── storyboard.js
+│   ├── stt.js
+│   ├── text-annotation.js
+│   ├── utils.js
+│   └── viewer.js
+└── styles/
+    ├── base.css
+    ├── buttons.css
+    ├── filmstrip.css
+    ├── forms.css
+    ├── layout.css
+    ├── modals.css
+    ├── overlays.css
+    └── viewer.css
 
 src-tauri/
-|-- src/
-|   |-- main.rs              (Tauri entry point, <50 lines)
-|   |-- capture.rs           (Screen capture commands) [278 lines - SPLIT REQUIRED]
-|   |-- notes/
-|   |   |-- mod.rs           (Notes module orchestrator)
-|   |   |-- types.rs         (Data structures)
-|   |   |-- save.rs          (Save operations)
-|   |   |-- format.rs        (AI formatting)
-|   |   |-- export.rs        (Session export)
-|   |-- speech.rs            (STT integration) [107 lines - OK]
-|-- Cargo.toml
-|-- tauri.conf.json
-
-docs/
-|-- ARCHITECTURE_PLAN.md     (This file)
-|-- META_LEDGER.md           (Audit chain)
-|-- SHADOW_GENOME.md         (Failure patterns)
-|-- CONCEPT.md               (Product vision)
+├── src/
+│   ├── main.rs
+│   ├── capture/
+│   └── notes/
+│       ├── archive.rs
+│       ├── bundle.rs
+│       ├── export.rs
+│       ├── save.rs
+│       ├── types.rs
+│       └── util.rs
+├── capabilities/default.json
+├── Cargo.toml
+└── tauri.conf.json
 
 tests/
-|-- js/
-|   |-- session.test.js      (Session management tests)
-|   |-- filmstrip.test.js    (Filmstrip UI tests)
-|-- rust/
-|   (Rust tests embedded in modules)
+├── annotations.test.js
+└── storyboard.test.js
 ```
 
-### Files to DELETE (Electron Deprecation)
+## Frontend responsibilities
 
-```
-DELETE: src/main.js
-DELETE: src/preload.js
-DELETE: src/renderer.js
-DELETE: src/core/event-bus.js
-DELETE: src/core/capture-engine.js
-DELETE: src/core/markup-manager.js
-DELETE: src/core/note-transcriber.js
-DELETE: src/core/metadata-injector.js
-DELETE: src/ui/main-window.js
-DELETE: src/ui/markup-toolbar.js
-DELETE: src/ui/screenshot-preview.js
-DELETE: src/ui/note-input-panel.js
-DELETE: src/utils/file-handler.js
-DELETE: src/utils/image-processor.js
-DELETE: src/utils/ai-formatter.js
-DELETE: index.html (root - replaced by dist/index.html)
-DELETE: styles.css (root - replaced by dist/styles/)
-DELETE: tests/event-bus.test.js
-```
+### Capture
 
----
+`capture.js` owns screen and region capture. Before a new frame is appended it persists the active frame, so capturing another state cannot discard current annotations or notes.
 
-## Interface Contracts
+### Session and ordering
 
-### Frontend Modules
+`session.js` owns the ordered frame collection and active frame. A frame persists:
 
-#### session.js
-- **Input**: Capture events, user actions
-- **Output**: Session state object
-- **Functions**: `startSession()`, `addCapture()`, `switchCapture()`, `getActiveCapture()`
+- original capture;
+- flattened annotated composite;
+- notes;
+- structured annotations;
+- capture metadata;
+- thumbnail;
+- timestamp and stable ID.
 
-#### capture.js
-- **Input**: User capture triggers (button, hotkey)
-- **Output**: Image data to session
-- **Functions**: `captureScreen()`, `captureRegion()`, `showRegionSelector()`
-- **Calls**: Tauri `capture_screen`, `capture_region`, `capture_all_screens`
+`filmstrip.js` owns navigation, deletion, and explicit left/right sequence changes.
 
-#### filmstrip.js
-- **Input**: Session captures array, user selection
-- **Output**: Thumbnail navigation UI
-- **Functions**: `renderFilmstrip()`, `selectThumbnail()`, `generateThumbnail()`
+### Annotation model
 
-#### markup.js
-- **Input**: Canvas element, user drawing actions
-- **Output**: Annotated image data
-- **Functions**: `initCanvas()`, `setTool()`, `draw()`, `undo()`, `clear()`
+`annotations.js` is a pure vector model. It provides cloning, bounds, hit-testing, movement, draft updates, and minimum-validity checks.
 
-#### notes.js
-- **Input**: Text/voice input, STT engine selection
-- **Output**: Note entries with timestamps
-- **Functions**: `addNote()`, `startSTT()`, `stopSTT()`, `getNotes()`
-- **STT Engines**: Web Speech API (primary), Windows Native (future)
+Supported annotation types are:
 
-#### settings.js
-- **Input**: User preferences
-- **Output**: localStorage persistence
-- **Functions**: `loadSettings()`, `saveSettings()`, `getSetting()`
-
-#### export.js
-- **Input**: Session data, export format selection
-- **Output**: Exported files via Tauri backend
-- **Functions**: `exportSession()`, `showExportModal()`
-- **Formats**: Individual files, Markdown report, ZIP archive
-
-### Backend Commands (Rust)
-
-#### capture.rs
-- `get_screens()` -> `Vec<ScreenInfo>`
-- `capture_screen(index?)` -> `CaptureResult`
-- `capture_screen_fast(index?)` -> `CaptureResult` (JPEG for overlay)
-- `capture_all_screens()` -> `CaptureResult`
-- `capture_all_screens_fast()` -> `CaptureResult`
-- `capture_region(options)` -> `CaptureResult`
-
-#### notes/mod.rs
-- `save_annotated_image(data, output_dir)` -> `SaveResult`
-- `format_for_ai(data)` -> `AIFormattedData`
-- `export_session(captures, format, session_id)` -> `ExportResult`
-
-#### speech.rs
-- `check_speech_available()` -> `bool`
-- `start_speech_recognition(app)` -> `Result<(), SpeechError>`
-- `stop_speech_recognition()` -> `Result<(), SpeechError>`
-
----
-
-## Data Flow
-
-```
-[User Action]
-    -> [capture.js]
-    -> [Tauri: capture.rs]
-    -> [session.js: addCapture()]
-    -> [filmstrip.js: renderFilmstrip()]
-
-[Markup Action]
-    -> [markup.js: draw()]
-    -> [session.js: updateCapture()]
-
-[Note Action]
-    -> [notes.js: addNote() or STT]
-    -> [session.js: addNoteToCapture()]
-
-[Export Action]
-    -> [export.js: exportSession()]
-    -> [Tauri: notes/export.rs]
-    -> [File System]
+```text
+pen     -> points[]
+arrow   -> x1,y1,x2,y2
+line    -> x1,y1,x2,y2
+rect    -> x1,y1,x2,y2
+ellipse -> x1,y1,x2,y2
+text    -> x,y,text,fontSize
 ```
 
----
+Every annotation also carries a stable ID, color, and size.
 
-## Dependencies
+`annotation-renderer.js` renders those vectors to the visible markup canvas and separately flattens them with the base screenshot for Save/export. Selection indicators are never included in the flattened evidence image.
 
-### Rust (Cargo.toml)
+`markup.js` owns pointer interaction, selection, movement, delete, clear, and orchestration. `markup-preview.js` owns preview/canvas mounting and editor visibility.
 
-| Crate       | Justification                              | Vanilla Alternative          |
-|-------------|--------------------------------------------|-----------------------------|
-| tauri       | Core framework                             | N/A                         |
-| screenshots | Screen capture                             | FFI to native APIs          |
-| base64      | Image encoding                             | Manual impl (error-prone)   |
-| serde       | Serialization                              | Manual JSON parsing         |
-| serde_json  | JSON handling                              | Manual parsing              |
-| dirs        | System directories                         | Env vars (platform-specific)|
+`markup-history.js` stores annotation snapshots for undo.
 
-**REMOVE**: `chrono` - Replace with `std::time::SystemTime` for timestamps
+### Viewer
 
-### Frontend
+`viewer.js` owns zoom and pan. View transforms never mutate capture pixels or annotation geometry.
 
-| Dependency  | Justification                              | Vanilla Alternative          |
-|-------------|--------------------------------------------|-----------------------------|
-| None        | Vanilla JS only                            | N/A                         |
+### Notes
 
----
+`notes.js` owns text notes and note rendering. If an annotation is selected when a note is submitted, the note stores that annotation's stable ID as `annotationId`.
 
-## Section 4 Razor Pre-Check
+Deleting an annotation removes that link but preserves the note as a frame note.
 
-### Current Violations (to be remediated)
+`stt.js` uses Web Speech only when supported. There is no native speech command surface.
 
-| File                 | Lines | Limit | Status           |
-|---------------------|-------|-------|------------------|
-| dist/app.js         | 1376  | 250   | SPLIT INTO 8 FILES |
-| dist/styles.css     | 934   | 250   | SPLIT INTO 4 FILES |
-| src-tauri/capture.rs| 278   | 250   | SPLIT INTO 2 FILES |
-| src-tauri/notes.rs  | 346   | 250   | SPLIT INTO 4 FILES |
+### Save and export
 
-### Post-Modularization Targets
+`export.js`:
 
-- [x] All planned functions <= 40 lines
-- [x] All planned files <= 250 lines
-- [x] No planned nesting > 3 levels
+1. saves the active flattened image as a full-resolution PNG plus JSON sidecar;
+2. persists the active frame before storyboard export;
+3. converts flattened frame images to PNG/JPEG and resizes them in the WebView when requested;
+4. shapes the ordered session through `storyboard.js`;
+5. calls the Rust filesystem/export boundary.
 
----
+## Rust responsibilities
 
-## Implementation Phases
+### Capture
 
-### Phase 1: Electron Cleanup
-1. Delete all files in `src/` directory (15 files)
-2. Delete root `index.html` and `styles.css`
-3. Delete `tests/event-bus.test.js`
-4. Update `.gitignore` if needed
+`capture/` provides commands for screen enumeration, selected-screen capture, multi-screen capture, and fast captures used by region selection.
 
-### Phase 2: Frontend Modularization
-1. Split `dist/app.js` (1376 lines) into 8 modules
-2. Split `dist/styles.css` (934 lines) into 4 stylesheets
-3. Update `dist/index.html` to load modules
+### Save Frame
 
-### Phase 3: Backend Modularization
-1. Split `capture.rs` into `capture/mod.rs`, `capture/multi.rs`
-2. Split `notes.rs` into `notes/mod.rs`, `notes/types.rs`, `notes/save.rs`, `notes/export.rs`
-3. Remove `chrono` dependency, use `SystemTime`
+`notes/save.rs`:
 
-### Phase 4: Ghost UI Remediation
-1. Either implement Windows Speech or remove native option from UI
-2. Verify all UI toggles connect to real functionality
+- defaults empty output requests to `Pictures/CritIQ/Saved`;
+- validates explicit output paths against the Pictures directory;
+- infers PNG/JPEG extension from the data URL;
+- preserves Save Frame at full capture resolution while storyboard export can use 100%, 75%, or 50% frame size;
+- writes the flattened image;
+- writes a JSON sidecar containing notes, structured annotations, metadata, timestamp, and image filename.
 
----
+### Storyboard export
 
-## MythIQ Theme Alignment
+`notes/export.rs` validates export mode, sanitizes session IDs, creates a clean staging directory, delegates bundle creation, and delegates ZIP creation.
 
-- Dark mode primary: `#0a0a1a` (background)
-- Accent purple: `#6366f1` (primary actions)
-- Accent cyan: `#06b6d4` (secondary/highlights)
-- Glass effect: `rgba(255, 255, 255, 0.05)` backdrop blur
-- Border glow: `box-shadow: 0 0 20px rgba(99, 102, 241, 0.3)`
+`notes/bundle.rs` writes the canonical contents:
 
----
+```text
+storyboard.md
+manifest.json
+frames/001.png
+frames/002.png
+...
+```
 
-_Blueprint created. Awaiting GATE tribunal via /ql-audit._
+JPEG exports use `.jpg` entries instead.
+
+`notes/archive.rs` packages the canonical contents into a deterministic ZIP entry order.
+
+## Storyboard data contract
+
+`manifest.json` uses:
+
+```text
+critiq.storyboard/v1
+```
+
+Each frame has this logical shape:
+
+```text
+Frame
+├── sequence
+├── stable id
+├── timestamp
+├── image path
+├── notes[]
+│   └── optional annotationId
+├── annotations[]
+└── metadata
+```
+
+The ordered frame array is authoritative for sequence. The flattened image is authoritative for what the user visually reviewed. Structured annotations provide machine-readable geometry and relationships.
+
+## Security and trust boundaries
+
+- Session IDs are sanitized before filesystem path construction.
+- Explicit Save paths are restricted to the user's Pictures directory.
+- The application does not require shell permissions.
+- The application does not expose a native speech command.
+- Capture and export are local operations.
+- No captured UI state is sent to an external service by the core product.
+
+## Validation contract
+
+Automated validation must cover:
+
+- frontend annotation-model tests;
+- frontend storyboard-contract tests;
+- `cargo check --locked`;
+- Rust unit tests;
+- Windows Tauri production build;
+- a check that building does not mutate `Cargo.lock`.
+
+Automated validation is necessary but not sufficient. The release-candidate interaction outcome is defined in `ACCEPTANCE_TEST.md`.
+
+## Non-goals
+
+Browser automation, cloud sync, accounts, collaborative editing, OCR, video recording, design-system integration, plugin loading, and embedded AI inference are outside the current product boundary.

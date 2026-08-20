@@ -1,4 +1,4 @@
-// Notes module — Type definitions
+// Notes module - Type definitions
 
 use serde::{Deserialize, Serialize};
 
@@ -8,12 +8,20 @@ pub struct Note {
     pub timestamp: String,
     #[serde(rename = "type")]
     pub note_type: String,
+    #[serde(
+        rename = "annotationId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub annotation_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AnnotatedData {
     pub image: String,
     pub notes: Vec<Note>,
+    #[serde(default)]
+    pub annotations: Vec<serde_json::Value>,
     pub metadata: serde_json::Value,
 }
 
@@ -35,6 +43,7 @@ pub struct AIFormattedData {
     pub timestamp: String,
     pub image_data: Option<String>,
     pub notes: Vec<Note>,
+    pub annotations: Vec<serde_json::Value>,
     pub metadata: serde_json::Value,
 }
 
@@ -43,6 +52,8 @@ pub struct CaptureExport {
     pub id: String,
     pub image: String,
     pub notes: Vec<Note>,
+    #[serde(default)]
+    pub annotations: Vec<serde_json::Value>,
     pub timestamp: String,
     pub metadata: Option<serde_json::Value>,
 }

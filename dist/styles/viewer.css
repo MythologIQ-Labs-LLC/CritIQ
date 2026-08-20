@@ -1,0 +1,119 @@
+/* CritIQ - Viewer, annotation linkage, and export controls */
+
+#toolbar {
+  height: auto;
+  min-height: var(--topbar-h);
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.view-tools {
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.zoom-label {
+  min-width: 48px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.canvas-container {
+  transform-origin: center center;
+  will-change: transform;
+}
+
+#preview.pan-mode,
+#preview.pan-mode canvas {
+  cursor: grab;
+}
+
+#preview.pan-mode:active,
+#preview.pan-mode:active canvas {
+  cursor: grabbing;
+}
+
+.note-target {
+  width: fit-content;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 11px;
+}
+
+.note-target.linked {
+  color: var(--accent-secondary);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.annotation-badge {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: var(--accent-secondary);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.export-settings {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.export-settings label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.quality-row {
+  display: grid;
+  gap: 6px;
+}
+
+.quality-row[hidden] {
+  display: none;
+}
+
+.quality-row input[type="range"] {
+  width: 100%;
+}
+
+@media (max-width: 1400px) {
+  #toolbar {
+    gap: 8px;
+  }
+
+  .toolbar-group {
+    gap: 6px;
+  }
+
+  .toolbar-group:not(:last-child)::after {
+    margin-left: 6px;
+  }
+}
+
+@media (max-width: 1100px) {
+  #toolbar {
+    align-items: flex-start;
+  }
+
+  .toolbar-group {
+    flex-wrap: wrap;
+  }
+
+  .toolbar-group::after {
+    display: none;
+  }
+}

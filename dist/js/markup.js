@@ -1,247 +1,231 @@
-// CritIQ - Markup/Canvas Module
+// CritIQ - Vector-backed markup and canvas interaction
 
-import { state, setCanvas, setBaseImage, getCanvas, getBaseImage } from './state.js';
-import { renderNotes } from './notes.js';
+import {
+  state,
+  setCanvas,
+  setBaseImage,
+  getCanvas,
+  getBaseImage,
+  generateId
+} from './state.js';
+import {
+  cloneAnnotations,
+  createAnnotation,
+  hitTestAnnotations,
+  isMeaningfulAnnotation,
+  moveAnnotation,
+  updateDraft
+} from './annotations.js';
+import { composeImage, renderAnnotations } from './annotation-renderer.js';
+import { pushAnnotationHistory, restorePreviousAnnotations } from './markup-history.js';
+import { requestAnnotationText } from './text-annotation.js';
+import { renderNotes, renderNoteTarget } from './notes.js';
+import { clearPreviewSurface, mountPreview } from './markup-preview.js';
 
 function updatePreview(imageData) {
-  const container = document.getElementById('preview');
-  if (!container || !imageData) return;
-
-  container.innerHTML = '';
-
-  const canvasContainer = document.createElement('div');
-  canvasContainer.className = 'canvas-container';
-
-  const img = document.createElement('img');
-  img.src = imageData;
-  img.alt = 'Screenshot preview';
-
-  img.onload = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    canvas.style.width = img.width + 'px';
-    canvas.style.height = img.height + 'px';
-    const ctx = canvas.getContext('2d');
-
-    setCanvas(canvas, ctx);
-    setBaseImage(img);
-
-    canvasContainer.appendChild(img);
-    canvasContainer.appendChild(canvas);
-
+  mountPreview(imageData, (canvas) => {
     setupCanvasEvents(canvas);
-  };
-
-  container.appendChild(canvasContainer);
-  document.getElementById('save-btn').disabled = false;
-  document.getElementById('markup-tools').style.display = 'flex';
+    renderMarkup();
+  });
 }
 
 function clearPreview() {
-  const container = document.getElementById('preview');
-  if (container) {
-    container.innerHTML = '<p class="placeholder">Click "Capture" to take a screenshot</p>';
-  }
-  document.getElementById('save-btn').disabled = true;
-  document.getElementById('markup-tools').style.display = 'none';
-  state.currentImage = null;
-  state.notes = [];
-  renderNotes();
+  clearPreviewSurface(resetMarkupState);
 }
 
 function setupCanvasEvents(canvas) {
-  if (!canvas) return;
-
-  canvas.addEventListener('mousedown', handleMouseDown);
-  canvas.addEventListener('mousemove', handleMouseMove);
-  canvas.addEventListener('mouseup', handleMouseUp);
-  canvas.addEventListener('mouseleave', handleMouseUp);
+  canvas.addEventListener('pointerdown', handlePointerDown);
+  canvas.addEventListener('pointermove', handlePointerMove);
+  canvas.addEventListener('pointerup', handlePointerUp);
+  canvas.addEventListener('pointercancel', handlePointerUp);
 }
 
-function getCanvasCoords(e) {
+function getCanvasCoords(event) {
   const { canvas } = getCanvas();
   const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
   return {
-    x: (e.clientX - rect.left) * scaleX,
-    y: (e.clientY - rect.top) * scaleY
+    x: (event.clientX - rect.left) * (canvas.width / rect.width),
+    y: (event.clientY - rect.top) * (canvas.height / rect.height)
   };
 }
 
-function handleMouseDown(e) {
-  const { canvas, ctx } = getCanvas();
-  const { x, y } = getCanvasCoords(e);
+function handlePointerDown(event) {
+  if (state.viewport.panMode) return;
+  const { x, y } = getCanvasCoords(event);
+
+  if (state.markup.tool === 'select') return beginSelectionDrag(x, y);
+  if (state.markup.tool === 'text') return addTextAnnotation(x, y);
+
   state.markup.isDrawing = true;
-  state.markup.startX = x;
-  state.markup.startY = y;
-
-  if (state.markup.tool === 'pen') {
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.strokeStyle = state.markup.color;
-    ctx.lineWidth = state.markup.size;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-  } else if (state.markup.tool === 'text') {
-    showTextInput(x, y);
-  }
-
-  saveCanvasState();
+  state.markup.draft = createAnnotation(
+    state.markup.tool,
+    generateId(),
+    x,
+    y,
+    state.markup
+  );
+  event.currentTarget.setPointerCapture?.(event.pointerId);
 }
 
-function handleMouseMove(e) {
-  if (!state.markup.isDrawing) return;
-  const { ctx } = getCanvas();
-  const { x, y } = getCanvasCoords(e);
+function beginSelectionDrag(x, y) {
+  const tolerance = Math.max(4, 10 / state.viewport.zoom);
+  const selectedId = hitTestAnnotations(
+    state.markup.annotations,
+    x,
+    y,
+    tolerance
+  );
 
-  if (state.markup.tool === 'pen') {
-    ctx.lineTo(x, y);
-    ctx.stroke();
-  } else if (state.markup.tool === 'rect' || state.markup.tool === 'arrow') {
-    restoreCanvasState();
-    drawShape(state.markup.startX, state.markup.startY, x, y);
+  state.markup.selectedId = selectedId;
+  state.markup.isDrawing = !!selectedId;
+  state.markup.dragX = x;
+  state.markup.dragY = y;
+  state.markup.dragMoved = false;
+  renderMarkup();
+  renderNoteTarget();
+}
+
+async function addTextAnnotation(x, y) {
+  const text = await requestAnnotationText();
+  if (!text) return;
+
+  pushAnnotationHistory();
+  state.markup.annotations.push(createAnnotation(
+    'text',
+    generateId(),
+    x,
+    y,
+    { ...state.markup, text }
+  ));
+  renderMarkup();
+}
+
+function handlePointerMove(event) {
+  if (!state.markup.isDrawing || state.viewport.panMode) return;
+  const { x, y } = getCanvasCoords(event);
+
+  if (state.markup.tool === 'select') {
+    dragSelected(x, y);
+  } else {
+    updateDraft(state.markup.draft, x, y);
+    renderMarkup();
   }
 }
 
-function handleMouseUp(e) {
+function dragSelected(x, y) {
+  const selected = state.markup.annotations.find(
+    (annotation) => annotation.id === state.markup.selectedId
+  );
+  if (!selected) return;
+
+  if (!state.markup.dragMoved) {
+    pushAnnotationHistory();
+    state.markup.dragMoved = true;
+  }
+  moveAnnotation(selected, x - state.markup.dragX, y - state.markup.dragY);
+  state.markup.dragX = x;
+  state.markup.dragY = y;
+  renderMarkup();
+}
+
+function handlePointerUp() {
   if (!state.markup.isDrawing) return;
-  const { ctx } = getCanvas();
   state.markup.isDrawing = false;
 
-  if (state.markup.tool === 'pen') {
-    ctx.closePath();
+  if (state.markup.tool === 'select') {
+    state.markup.dragMoved = false;
+    return;
   }
-}
-
-function drawShape(x1, y1, x2, y2) {
-  const { ctx } = getCanvas();
-  ctx.strokeStyle = state.markup.color;
-  ctx.lineWidth = state.markup.size;
-  ctx.lineCap = 'round';
-
-  if (state.markup.tool === 'rect') {
-    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-  } else if (state.markup.tool === 'arrow') {
-    drawArrow(x1, y1, x2, y2);
+  if (isMeaningfulAnnotation(state.markup.draft)) {
+    pushAnnotationHistory();
+    state.markup.annotations.push(state.markup.draft);
   }
-}
-
-function drawArrow(x1, y1, x2, y2) {
-  const { ctx } = getCanvas();
-  const headLen = 15;
-  const angle = Math.atan2(y2 - y1, x2 - x1);
-
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
-  ctx.stroke();
-}
-
-function showTextInput(x, y) {
-  const { ctx } = getCanvas();
-  const overlay = document.createElement('div');
-  overlay.className = 'text-input-overlay';
-
-  const dialog = document.createElement('div');
-  dialog.className = 'text-input-dialog';
-  dialog.innerHTML = `
-    <input type="text" id="text-input" placeholder="Enter text..." autofocus>
-    <div class="dialog-buttons">
-      <button id="text-cancel" class="btn btn-secondary">Cancel</button>
-      <button id="text-ok" class="btn btn-primary">Add</button>
-    </div>
-  `;
-
-  overlay.appendChild(dialog);
-  document.body.appendChild(overlay);
-
-  const input = document.getElementById('text-input');
-  input.focus();
-
-  const addText = () => {
-    const text = input.value.trim();
-    if (text) {
-      ctx.font = `${state.markup.size * 4}px sans-serif`;
-      ctx.fillStyle = state.markup.color;
-      ctx.fillText(text, x, y);
-    }
-    overlay.remove();
-    state.markup.isDrawing = false;
-  };
-
-  document.getElementById('text-ok').addEventListener('click', addText);
-  document.getElementById('text-cancel').addEventListener('click', () => {
-    overlay.remove();
-    state.markup.isDrawing = false;
-  });
-  input.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') addText();
-  });
-}
-
-function saveCanvasState() {
-  const { canvas, ctx } = getCanvas();
-  if (!ctx) return;
-  state.markup.history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
-  if (state.markup.history.length > 50) {
-    state.markup.history.shift();
-  }
-}
-
-function restoreCanvasState() {
-  const { ctx } = getCanvas();
-  if (state.markup.history.length > 0) {
-    ctx.putImageData(state.markup.history[state.markup.history.length - 1], 0, 0);
-  }
+  state.markup.draft = null;
+  renderMarkup();
 }
 
 function undo() {
-  const { canvas, ctx } = getCanvas();
-  if (state.markup.history.length > 1) {
-    state.markup.history.pop();
-    restoreCanvasState();
-  } else if (state.markup.history.length === 1) {
-    state.markup.history.pop();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  }
+  if (!restorePreviousAnnotations()) return;
+  renderMarkup();
+  renderNoteTarget();
 }
 
 function clearCanvas() {
-  const { canvas, ctx } = getCanvas();
-  if (!ctx) return;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  state.markup.history = [];
+  if (state.markup.annotations.length === 0) return;
+  pushAnnotationHistory();
+  state.markup.annotations = [];
+  state.markup.selectedId = null;
+  state.notes.forEach((note) => delete note.annotationId);
+  renderMarkup();
+  renderNotes();
+  renderNoteTarget();
 }
 
-function getCompositeImage() {
+function deleteSelected() {
+  const selectedId = state.markup.selectedId;
+  if (!selectedId) return;
+
+  pushAnnotationHistory();
+  state.markup.annotations = state.markup.annotations.filter(
+    (annotation) => annotation.id !== selectedId
+  );
+  state.notes.forEach((note) => {
+    if (note.annotationId === selectedId) delete note.annotationId;
+  });
+  state.markup.selectedId = null;
+  renderMarkup();
+  renderNotes();
+  renderNoteTarget();
+}
+
+function renderMarkup() {
+  const { ctx } = getCanvas();
+  if (!ctx) return;
+  renderAnnotations(
+    ctx,
+    state.markup.annotations,
+    state.markup.selectedId,
+    state.markup.draft
+  );
+}
+
+function loadAnnotations(annotations = []) {
+  state.markup.annotations = cloneAnnotations(annotations);
+  state.markup.history = [];
+  state.markup.selectedId = null;
+  state.markup.draft = null;
+  state.markup.isDrawing = false;
+  state.markup.dragMoved = false;
+  renderMarkup();
+  renderNoteTarget();
+}
+
+function resetMarkupState() {
+  loadAnnotations([]);
+}
+
+function getCompositeImage(format = 'png', quality = 0.9) {
   const { canvas } = getCanvas();
   const baseImage = getBaseImage();
-  if (!canvas || !baseImage) return state.currentImage;
-
-  const composite = document.createElement('canvas');
-  composite.width = canvas.width;
-  composite.height = canvas.height;
-  const compCtx = composite.getContext('2d');
-
-  compCtx.drawImage(baseImage, 0, 0);
-  compCtx.drawImage(canvas, 0, 0);
-
-  return composite.toDataURL('image/png');
+  if (!canvas || !baseImage) return null;
+  return composeImage(
+    baseImage,
+    canvas.width,
+    canvas.height,
+    state.markup.annotations,
+    format,
+    quality
+  );
 }
 
 export {
-  updatePreview,
-  clearPreview,
-  undo,
   clearCanvas,
-  getCompositeImage
+  clearPreview,
+  deleteSelected,
+  getCompositeImage,
+  loadAnnotations,
+  renderMarkup,
+  resetMarkupState,
+  undo,
+  updatePreview
 };

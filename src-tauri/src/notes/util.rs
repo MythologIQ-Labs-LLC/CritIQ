@@ -2,24 +2,18 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Generate ISO 8601 timestamp using std::time (no chrono dependency)
 pub fn get_iso_timestamp() -> String {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default();
-
     let secs = duration.as_secs();
     let millis = duration.subsec_millis();
-
-    // Calculate date/time components
     let days = secs / 86400;
     let time_of_day = secs % 86400;
     let hours = time_of_day / 3600;
     let minutes = (time_of_day % 3600) / 60;
     let seconds = time_of_day % 60;
-
-    // Calculate year, month, day from days since epoch
-    let (year, month, day) = days_to_ymd(days as i64 + 719468); // Adjust for Unix epoch
+    let (year, month, day) = days_to_ymd(days as i64 + 719468);
 
     format!(
         "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
@@ -27,9 +21,7 @@ pub fn get_iso_timestamp() -> String {
     )
 }
 
-/// Convert days since epoch to year/month/day
 fn days_to_ymd(days: i64) -> (i32, u32, u32) {
-    // Algorithm from: http://howardhinnant.github.io/date_algorithms.html
     let era = if days >= 0 { days } else { days - 146096 } / 146097;
     let doe = (days - era * 146097) as u32;
     let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
@@ -42,9 +34,7 @@ fn days_to_ymd(days: i64) -> (i32, u32, u32) {
     (y as i32, m, d)
 }
 
-/// Extract time portion from ISO timestamp string
 pub fn format_time_from_iso(iso_str: &str) -> String {
-    // Parse HH:MM:SS from ISO format like "2024-01-15T14:30:45.123Z"
     if let Some(t_pos) = iso_str.find('T') {
         let time_part = &iso_str[t_pos + 1..];
         if time_part.len() >= 8 {
@@ -54,13 +44,27 @@ pub fn format_time_from_iso(iso_str: &str) -> String {
     iso_str.to_string()
 }
 
-/// Strip base64 data URL prefix from image string
 pub fn strip_base64_prefix(data: &str) -> &str {
-    if data.starts_with("data:image/png;base64,") {
-        &data["data:image/png;base64,".len()..]
-    } else if data.starts_with("data:image/jpeg;base64,") {
-        &data["data:image/jpeg;base64,".len()..]
-    } else {
-        data
+    const PREFIXES: [&str; 3] = [
+        "data:image/png;base64,",
+        "data:image/jpeg;base64,",
+        "data:image/jpg;base64,",
+    ];
+    PREFIXES
+        .iter()
+        .find_map(|prefix| data.strip_prefix(prefix))
+        .unwrap_or(data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_base64_prefix;
+
+    #[test]
+    fn strips_supported_image_data_url_prefixes() {
+        assert_eq!(strip_base64_prefix("data:image/png;base64,abc"), "abc");
+        assert_eq!(strip_base64_prefix("data:image/jpeg;base64,abc"), "abc");
+        assert_eq!(strip_base64_prefix("data:image/jpg;base64,abc"), "abc");
+        assert_eq!(strip_base64_prefix("abc"), "abc");
     }
 }
