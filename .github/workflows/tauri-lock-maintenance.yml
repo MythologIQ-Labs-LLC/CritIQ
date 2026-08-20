@@ -1,0 +1,61 @@
+name: One-shot Tauri lock alignment
+
+on:
+  pull_request_target:
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  align-tauri-lock:
+    if: >-
+      github.event.pull_request.number == 4 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'dependabot/cargo/src-tauri/tauri-2.11.1'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Align package lock without executing PR code
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const branch = context.payload.pull_request.head.ref;
+            const path = 'package-lock.json';
+
+            const { data: file } = await github.rest.repos.getContent({ owner, repo, path, ref: branch });
+            const original = Buffer.from(file.content, 'base64').toString('utf8');
+            const lock = JSON.parse(original);
+
+            if (lock.packages?.['node_modules/postcss']?.version !== '8.5.26') {
+              throw new Error('Expected validated PostCSS 8.5.26 baseline');
+            }
+            if (lock.packages?.['node_modules/nanoid']?.version !== '3.3.18') {
+              throw new Error('Expected validated nanoid 3.3.18 baseline');
+            }
+
+            lock.packages[''].dependencies['@tauri-apps/api'] = '^2.11.1';
+            const api = lock.packages['node_modules/@tauri-apps/api'];
+            if (!api || !['2.10.1', '2.11.1'].includes(api.version)) {
+              throw new Error(`Unexpected @tauri-apps/api baseline: ${api?.version}`);
+            }
+            api.version = '2.11.1';
+            api.resolved = 'https://registry.npmjs.org/@tauri-apps/api/-/api-2.11.1.tgz';
+            api.integrity = 'sha512-M2FPuYND2m+wh5hfW9ZpSdxMPdEJovPBWwoHJmwUpysTYNHaOkVFN419m/K0LIgjb/7KU2vBgsUepJWugQCvAA==';
+
+            const updated = `${JSON.stringify(lock, null, 2)}\n`;
+            if (updated === original) {
+              core.info('package-lock.json is already aligned');
+              return;
+            }
+
+            await github.rest.repos.createOrUpdateFileContents({
+              owner,
+              repo,
+              path,
+              branch,
+              sha: file.sha,
+              message: 'Align Tauri frontend lockfile',
+              content: Buffer.from(updated).toString('base64')
+            });
